@@ -5,33 +5,40 @@ public class EnemyAI : MonoBehaviour
 {
     public enum State { Idle, Search, Chase, Attack }
 
-    public Transform player;
-    public NavMeshAgent agent;
+    [SerializeField] private Transform player;
+    [SerializeField] private NavMeshAgent agent;
 
-    public float detectRange = 15f;
-    public float attackRange = 2.5f;
+    [SerializeField] private float detectRange = 15f;
+    [SerializeField] private float attackRange = 2.5f;
 
-    public float idleSpeed = 3.5f;
-    public float chaseSpeed = 10f;
-    public float searchSpeed = 4.5f;
+    [SerializeField] private float idleSpeed = 3.5f;
+    [SerializeField] private float chaseSpeed = 10f;
+    [SerializeField] private float searchSpeed = 4.5f;
 
-    public float searchDuration = 5f;
-    public float attackDuration = 0.6f;
+    [SerializeField] private float searchDuration = 5f;
+    [SerializeField] private float attackDuration = 0.6f;
 
-    public float stopDistanceFromPlayer = 1.2f;
+    [SerializeField] private float stopDistanceFromPlayer = 1.2f;
 
-    State currentState = State.Idle;
+    private State currentState = State.Idle;
 
-    Vector3 lastKnownPosition;
-    float searchTimer;
-    float attackTimer;
+    private Vector3 lastKnownPosition;
+    private float searchTimer;
+    private float attackTimer;
 
-    float sqrDetectRange;
-    float sqrAttackRange;
+    private float sqrDetectRange;
+    private float sqrAttackRange;
+
+    public Renderer rend;
+    public Color idleColor = Color.green;
+    public Color searchColor = Color.yellow;
+    public Color chaseColor = Color.orange;
+    public Color attackColor = Color.red;
 
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
+        if (!rend) rend = GetComponentInChildren<Renderer>();
         sqrDetectRange = detectRange * detectRange;
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = stopDistanceFromPlayer;
@@ -105,7 +112,18 @@ public class EnemyAI : MonoBehaviour
         if (next == State.Attack) attackTimer = attackDuration;
         if (next == State.Chase) agent.speed = chaseSpeed;
         if (next == State.Idle) agent.ResetPath();
+        ApplyColor(next);
         Debug.Log($"Enemy state -> {next}");
+    }
+
+    void ApplyColor(State s)
+    {
+        if (!rend) return;
+        var c = idleColor;
+        if (s == State.Search) c = searchColor;
+        else if (s == State.Chase) c = chaseColor;
+        else if (s == State.Attack) c = attackColor;
+        rend.material.color = c;
     }
 
     void OnValidate()
