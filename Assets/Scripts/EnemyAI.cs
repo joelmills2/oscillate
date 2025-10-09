@@ -1,3 +1,15 @@
+// Sources:
+// https://learn.unity.com/tutorial/introduction-to-navmesh-agents
+// https://docs.unity3d.com/ScriptReference/AI.NavMesh.SamplePosition.html
+// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMeshAgent.Raycast.html
+// https://discussions.unity.com/t/beginner-question-regarding-ai-view-radius-and-line-of-sight/765569
+// https://www.youtube.com/watch?v=znZXmmyBF-o
+// https://www.youtube.com/watch?v=UjkSFoLxesw
+// https://www.gamedeveloper.com/
+// https://learn.unity.com/project/navigation-and-pathfinding
+// https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html
+
+
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -22,7 +34,7 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float searchDuration = 6f;
     [SerializeField] float fireCooldown = 0.75f;
     [SerializeField] float idleMinTime = 2f;
-    [SerializeField] float chaseLoseSightGrace = 1f;
+    [SerializeField] float stayInChaseTime = 1f;
 
     [Header("Search Behavior")]
     [SerializeField] float searchRadius = 15f;
@@ -110,7 +122,7 @@ public class EnemyAI : MonoBehaviour
                 {
                     agent.SetDestination(player.position);
                 }
-                else if (timeSinceLastSeen >= chaseLoseSightGrace)
+                else if (timeSinceLastSeen >= stayInChaseTime)
                 {
                     SetState(State.Search);
                     break;
