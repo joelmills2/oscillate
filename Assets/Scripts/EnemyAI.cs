@@ -1,17 +1,5 @@
-// Sources:
-// https://learn.unity.com/tutorial/introduction-to-navmesh-agents
-// https://docs.unity3d.com/ScriptReference/AI.NavMesh.SamplePosition.html
-// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMeshAgent.Raycast.html
-// https://discussions.unity.com/t/beginner-question-regarding-ai-view-radius-and-line-of-sight/765569
-// https://www.youtube.com/watch?v=znZXmmyBF-o
-// https://www.youtube.com/watch?v=UjkSFoLxesw
-// https://www.gamedeveloper.com/
-// https://learn.unity.com/project/navigation-and-pathfinding
-// https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html=
-
 using UnityEngine;
 using UnityEngine.AI;
-
 
 public class EnemyAI : MonoBehaviour
 {
@@ -33,6 +21,8 @@ public class EnemyAI : MonoBehaviour
     [Header("Timers")]
     [SerializeField] float searchDuration = 6f;
     [SerializeField] float fireCooldown = 0.75f;
+    [SerializeField] float idleMinTime = 2f;
+    [SerializeField] float chaseLoseSightGrace = 1f;
 
     [Header("Search Behavior")]
     [SerializeField] float searchRadius = 15f;
@@ -60,6 +50,7 @@ public class EnemyAI : MonoBehaviour
     float nextFireTime;
     float sqrAttackRange;
     float timeSinceLastSeen;
+    float idleTimer;
 
     void Awake()
     {
@@ -78,14 +69,8 @@ public class EnemyAI : MonoBehaviour
 
         bool visible = CanSeePlayer();
 
-        if (visible)
-        {
-            timeSinceLastSeen = 0f;
-        }
-        else
-        {
-            timeSinceLastSeen += Time.deltaTime;
-        }
+        if (visible) timeSinceLastSeen = 0f;
+        else timeSinceLastSeen += Time.deltaTime;
 
         bool canDetect = visible || (timeSinceLastSeen < 2f);
         float sqrDist = (player.position - transform.position).sqrMagnitude;
@@ -95,8 +80,9 @@ public class EnemyAI : MonoBehaviour
         {
             case State.Idle:
                 agent.isStopped = true;
+                idleTimer -= Time.deltaTime;
                 if (canDetect) SetState(State.Chase);
-                else if (Time.time % 3f < 0.02f) SetState(State.Search);
+                else if (idleTimer <= 0f && Time.time % 3f < 0.02f) SetState(State.Search);
                 break;
 
             case State.Search:
@@ -112,14 +98,8 @@ public class EnemyAI : MonoBehaviour
 
                 searchTimer -= Time.deltaTime;
 
-                if (visible)
-                {
-                    SetState(State.Chase);
-                }
-                else if (searchTimer <= 0f)
-                {
-                    SetState(State.Idle);
-                }
+                if (visible) SetState(State.Chase);
+                else if (searchTimer <= 0f) SetState(State.Idle);
                 break;
 
             case State.Chase:
@@ -130,7 +110,7 @@ public class EnemyAI : MonoBehaviour
                 {
                     agent.SetDestination(player.position);
                 }
-                else
+                else if (timeSinceLastSeen >= chaseLoseSightGrace)
                 {
                     SetState(State.Search);
                     break;
@@ -170,7 +150,7 @@ public class EnemyAI : MonoBehaviour
 
         if (next == State.Search) searchTimer = searchDuration;
         if (next == State.Attack) nextFireTime = Time.time;
-        if (next == State.Idle) agent.ResetPath();
+        if (next == State.Idle) { agent.ResetPath(); idleTimer = idleMinTime; }
 
         ApplyColor(next);
     }
