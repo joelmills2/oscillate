@@ -9846,7 +9846,7 @@ Transform:
   m_GameObject: {fileID: 1348482756}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -47.22, y: -1.4803905, z: -15.1}
+  m_LocalPosition: {x: -5.29, y: -1.4803905, z: 11.67}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9872,14 +9872,14 @@ MonoBehaviour:
   detectRange: 50
   attackRange: 20
   attackHoldDistance: 8
-  idleSpeed: 3.5
   searchSpeed: 4.5
   chaseSpeed: 6
-  searchDuration: 6
-  attackDuration: 0.6
+  searchDuration: 4
   fireCooldown: 0.75
+  idleMinTime: 2
+  chaseLoseSightGrace: 1
   searchRadius: 15
-  viewAngle: 90
+  viewAngle: 120
   eyeHeight: 1.6
   obstacleMask:
     serializedVersion: 2
