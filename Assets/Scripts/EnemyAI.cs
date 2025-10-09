@@ -24,7 +24,7 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float attackDuration = 0.6f;
     [SerializeField] float fireCooldown = 0.75f;
 
-    [Header("Search (Roam) Behavior")]
+    [Header("Search Behavior")]
     [SerializeField] float searchRadius = 15f;
     float searchTimer;
 
@@ -248,21 +248,5 @@ public class EnemyAI : MonoBehaviour
         sqrDetectRange = detectRange * detectRange;
         sqrAttackRange = attackRange * attackRange;
         if (agent) agent.stoppingDistance = attackHoldDistance;
-    }
-
-    void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectRange);
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(lastKnownPosition, 0.3f);
-
-        Gizmos.color = Color.cyan;
-        Vector3 left = Quaternion.Euler(0, -viewAngle / 2f, 0) * transform.forward;
-        Vector3 right = Quaternion.Euler(0, viewAngle / 2f, 0) * transform.forward;
-        Gizmos.DrawLine(transform.position, transform.position + left * detectRange);
-        Gizmos.DrawLine(transform.position, transform.position + right * detectRange);
     }
 }
