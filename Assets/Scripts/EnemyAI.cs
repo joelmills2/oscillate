@@ -1,5 +1,17 @@
+// Sources:
+// https://learn.unity.com/tutorial/introduction-to-navmesh-agents
+// https://docs.unity3d.com/ScriptReference/AI.NavMesh.SamplePosition.html
+// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMeshAgent.Raycast.html
+// https://discussions.unity.com/t/beginner-question-regarding-ai-view-radius-and-line-of-sight/765569
+// https://www.youtube.com/watch?v=znZXmmyBF-o
+// https://www.youtube.com/watch?v=UjkSFoLxesw
+// https://www.gamedeveloper.com/
+// https://learn.unity.com/project/navigation-and-pathfinding
+// https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html=
+
 using UnityEngine;
 using UnityEngine.AI;
+
 
 public class EnemyAI : MonoBehaviour
 {
@@ -15,13 +27,11 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float attackHoldDistance = 8f;
 
     [Header("Speeds")]
-    [SerializeField] float idleSpeed = 3.5f;
     [SerializeField] float searchSpeed = 4.5f;
     [SerializeField] float chaseSpeed = 10f;
 
     [Header("Timers")]
     [SerializeField] float searchDuration = 6f;
-    [SerializeField] float attackDuration = 0.6f;
     [SerializeField] float fireCooldown = 0.75f;
 
     [Header("Search Behavior")]
@@ -47,10 +57,7 @@ public class EnemyAI : MonoBehaviour
     public Color attackColor = Color.red;
 
     State currentState = State.Idle;
-    Vector3 lastKnownPosition;
-    float attackTimer;
     float nextFireTime;
-    float sqrDetectRange;
     float sqrAttackRange;
     float timeSinceLastSeen;
 
@@ -59,7 +66,6 @@ public class EnemyAI : MonoBehaviour
         if (!agent) agent = GetComponent<NavMeshAgent>();
         if (!rend) rend = GetComponentInChildren<Renderer>();
 
-        sqrDetectRange = detectRange * detectRange;
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = attackHoldDistance;
 
@@ -74,7 +80,6 @@ public class EnemyAI : MonoBehaviour
 
         if (visible)
         {
-            lastKnownPosition = player.position;
             timeSinceLastSeen = 0f;
         }
         else
@@ -89,7 +94,6 @@ public class EnemyAI : MonoBehaviour
         switch (currentState)
         {
             case State.Idle:
-                agent.speed = idleSpeed;
                 agent.isStopped = true;
                 if (canDetect) SetState(State.Chase);
                 else if (Time.time % 3f < 0.02f) SetState(State.Search);
@@ -121,7 +125,6 @@ public class EnemyAI : MonoBehaviour
             case State.Chase:
                 agent.speed = chaseSpeed;
                 agent.isStopped = false;
-                agent.stoppingDistance = attackHoldDistance;
 
                 if (visible)
                 {
@@ -129,7 +132,6 @@ public class EnemyAI : MonoBehaviour
                 }
                 else
                 {
-                    searchTimer = searchDuration;
                     SetState(State.Search);
                     break;
                 }
@@ -140,7 +142,6 @@ public class EnemyAI : MonoBehaviour
             case State.Attack:
                 agent.isStopped = false;
                 agent.speed = 0f;
-                agent.stoppingDistance = attackHoldDistance;
                 agent.SetDestination(player.position);
 
                 Vector3 look = player.position;
@@ -149,15 +150,14 @@ public class EnemyAI : MonoBehaviour
 
                 if (Time.time >= nextFireTime) Fire();
 
-                attackTimer -= Time.deltaTime;
-                if (attackTimer <= 0f)
+                if (!visible)
                 {
-                    if (visible) SetState(State.Chase);
-                    else
-                    {
-                        searchTimer = searchDuration;
-                        SetState(State.Search);
-                    }
+                    searchTimer = searchDuration;
+                    SetState(State.Search);
+                }
+                else if (!inAttack)
+                {
+                    SetState(State.Chase);
                 }
                 break;
         }
@@ -169,12 +169,7 @@ public class EnemyAI : MonoBehaviour
         currentState = next;
 
         if (next == State.Search) searchTimer = searchDuration;
-        if (next == State.Attack)
-        {
-            attackTimer = attackDuration;
-            nextFireTime = Time.time;
-        }
-        if (next == State.Chase) agent.speed = chaseSpeed;
+        if (next == State.Attack) nextFireTime = Time.time;
         if (next == State.Idle) agent.ResetPath();
 
         ApplyColor(next);
@@ -221,7 +216,6 @@ public class EnemyAI : MonoBehaviour
         return true;
     }
 
-
     Vector3 GetRandomSearchPoint()
     {
         Vector3 randomDir = Random.insideUnitSphere * searchRadius;
@@ -245,7 +239,6 @@ public class EnemyAI : MonoBehaviour
 
     void OnValidate()
     {
-        sqrDetectRange = detectRange * detectRange;
         sqrAttackRange = attackRange * attackRange;
         if (agent) agent.stoppingDistance = attackHoldDistance;
     }
