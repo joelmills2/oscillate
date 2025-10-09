@@ -2,7 +2,7 @@
 
 ## FSM Diagram
 
-![FSM Diagram](FSM.jpg)
+<img src="FSM.jpg" alt="FSM Diagram" style="width:100%; max-width:1000px; display:block; margin:auto;" />
 
 ## States and Transitions
 
