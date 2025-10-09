@@ -68,3 +68,5 @@ Cannot directly transition from:
 - Attack to Idle
 
 ## Gameplay Video Link
+https://youtu.be/JSsA-CsP0lA
+
