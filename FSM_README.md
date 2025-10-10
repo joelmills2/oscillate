@@ -10,21 +10,21 @@
 
 #### Idle
 
-The starting state of the enemy. Occurs when the enemy is not aware of the player's location and the timer to search has not yet elapsed (2 seconds). The enemy is aware of the location of the player when it is within 50 units of distance and has a clear line of sight to the player using a raycast, inside a 120 degree field of view. The enemy's color changes to green while idle.
+The starting state of the enemy. Occurs when the enemy is not aware of the player's location and the timer to search has not yet elapsed (2 seconds). The enemy is aware of the location of the player when it is within 50 units of distance and has a clear line of sight to the player using a raycast, inside a 120-degree field of view. The enemy's colour changes to green while idle.
 
 
 #### Search
 
-The enemy is searching for the player. This state is entered when the enemy does not have sight of the player or the timer to search from idle has elapsed. In this state, the enemy moves to random points within a certain radius around its current position (15 units). These points are chosen using a function that picks a random direction and distance, then finds the nearest valid position on the NavMesh. This allows the enemy to search the area intelligently rather than wandering aimlessly. Each search lasts up to 4 seconds before a new point is chosen or the enemy returns to idle. The enemy's color changes to light blue while searching.
+The enemy is searching for the player. This state is entered when the enemy does not have sight of the player, or the timer to search from idle has elapsed. In this state, the enemy moves to random points within a certain radius around its current position (15 units). These points are chosen using a function that picks a random direction and distance, then finds the nearest valid position on the NavMesh. This allows the enemy to search the area intelligently rather than wandering aimlessly. Each search lasts up to 4 seconds before a new point is chosen or the enemy returns to idle. The enemy's colour changes to light blue while searching.
 
 
 #### Chase
 
-The enemy has detected the player and is actively pursuing them. This state is entered when the enemy sees the player or remembers their location for a short time after losing sight (up to 1 second). The enemy's color changes to bright orange while chasing.
+The enemy has detected the player and is actively pursuing them. This state is entered when the enemy sees the player or remembers their location for a short time after losing sight (up to 1 second). The enemy's colour changes to bright orange while chasing.
 
 #### Attack
 
-The enemy is in range to attack the player (20 units). This state is entered when the enemy is close enough to the player to perform a ranged attack. The enemy will continue attacking as long as the player is visible and within range, attempting to hold a distance of about 8 units. It fires projectiles every 0.75 seconds. The enemy's color changes to red while attacking.
+The enemy is in range to attack the player (20 units). This state is entered when the enemy is close enough to the player to perform a ranged attack. The enemy will continue attacking as long as the player is visible and within range, attempting to hold a distance of about 8 units. It fires projectiles every 0.75 seconds. The enemy's colour changes to red while attacking.
 
 ### Transitions
 
@@ -34,7 +34,7 @@ Occurs when the player is out of range of the enemy, and the enemy does not see 
 
 #### Idle -> Chase
 
-Occurs when the player is in range of the enemy, and the enemy sees the player from the idle state (within 50 units, inside 120 FOV, and with clear line of sight).
+Occurs when the player is in range of the enemy, and the enemy sees the player from the idle state (within 50 units and with a clear line of sight).
 
 #### Search -> Idle
 
