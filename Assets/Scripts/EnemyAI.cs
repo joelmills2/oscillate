@@ -1,20 +1,11 @@
-// Sources:
-// https://learn.unity.com/tutorial/introduction-to-navmesh-agents
-// https://docs.unity3d.com/ScriptReference/AI.NavMesh.SamplePosition.html
-// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMeshAgent.Raycast.html
-// https://discussions.unity.com/t/beginner-question-regarding-ai-view-radius-and-line-of-sight/765569
-// https://www.youtube.com/watch?v=znZXmmyBF-o
-// https://www.youtube.com/watch?v=UjkSFoLxesw
-// https://www.gamedeveloper.com/
-// https://learn.unity.com/project/navigation-and-pathfinding
-// https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html
-
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections.Generic;
 
 public class EnemyAI : MonoBehaviour
 {
     public enum State { Idle, Patrol, Chase, Attack }
+    enum SequencePhase { None, Forward, Backward }
 
     [Header("References")]
     [SerializeField] Transform player;
@@ -54,6 +45,10 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float projectileSpeed = 25f;
     [SerializeField] float spawnOffset = 0.4f;
 
+    [Header("Sequence Trigger")]
+    [SerializeField] string sequenceTriggerName = "PWcave1";
+    [SerializeField] Transform[] sequenceOrder;
+
     [Header("Visual Debugging")]
     public Renderer rend;
     public Color idleColor = Color.green;
@@ -62,6 +57,8 @@ public class EnemyAI : MonoBehaviour
     public Color attackColor = Color.red;
 
     State currentState = State.Idle;
+    SequencePhase seqPhase = SequencePhase.None;
+
     float nextFireTime;
     float sqrAttackRange;
     float timeSinceLastSeen;
@@ -82,6 +79,9 @@ public class EnemyAI : MonoBehaviour
     float lastRemainingDist;
     Vector3 currentGoal;
 
+    readonly Queue<Transform> sequenceQueue = new Queue<Transform>();
+    Transform lastAssignedGoalTransform;
+
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
@@ -100,7 +100,6 @@ public class EnemyAI : MonoBehaviour
 
         bool visible = CanSeePlayer();
         if (visible) timeSinceLastSeen = 0f; else timeSinceLastSeen += Time.deltaTime;
-
         if (!visible && timeSinceLastSeen >= currentUnseenThreshold && currentState != State.Idle) SetState(State.Idle);
 
         bool canDetect = visible || (timeSinceLastSeen < 2f);
@@ -122,7 +121,8 @@ public class EnemyAI : MonoBehaviour
                 agent.speed = patrolSpeed;
                 if (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance)
                 {
-                    currentGoal = GetNextPatrolDestination();
+                    OnReached(lastAssignedGoalTransform);
+                    currentGoal = GetNextPatrolDestination(out lastAssignedGoalTransform);
                     TrySetPathTo(currentGoal);
                 }
                 UpdateLook(true);
@@ -188,6 +188,50 @@ public class EnemyAI : MonoBehaviour
         ApplyColor(next);
     }
 
+    void OnReached(Transform reached)
+    {
+        if (!reached) return;
+
+        if (seqPhase == SequencePhase.None && reached.name == sequenceTriggerName)
+        {
+            sequenceQueue.Clear();
+            if (sequenceOrder != null)
+            {
+                for (int i = 0; i < sequenceOrder.Length; i++)
+                    if (sequenceOrder[i] && sequenceOrder[i] != reached) sequenceQueue.Enqueue(sequenceOrder[i]);
+                if (sequenceQueue.Count > 0) seqPhase = SequencePhase.Forward;
+            }
+            return;
+        }
+
+        if (seqPhase == SequencePhase.Forward && sequenceQueue.Count == 0)
+        {
+            sequenceQueue.Clear();
+            if (sequenceOrder != null && sequenceOrder.Length > 0)
+            {
+                for (int i = sequenceOrder.Length - 1; i >= 0; i--)
+                    if (sequenceOrder[i]) sequenceQueue.Enqueue(sequenceOrder[i]);
+                Transform trigger = FindTriggerTransform();
+                if (trigger) sequenceQueue.Enqueue(trigger);
+                seqPhase = SequencePhase.Backward;
+            }
+            return;
+        }
+
+        if (seqPhase == SequencePhase.Backward && sequenceQueue.Count == 0 && reached.name == sequenceTriggerName)
+        {
+            seqPhase = SequencePhase.None;
+        }
+    }
+
+    Transform FindTriggerTransform()
+    {
+        if (patrolPoints == null) return null;
+        for (int i = 0; i < patrolPoints.Length; i++)
+            if (patrolPoints[i] && patrolPoints[i].name == sequenceTriggerName) return patrolPoints[i];
+        return null;
+    }
+
     bool NeedRepath(Vector3 worldTarget)
     {
         if (Time.time - lastRepathTime < repathInterval) return false;
@@ -199,68 +243,34 @@ public class EnemyAI : MonoBehaviour
     bool TrySetPathTo(Vector3 worldTarget)
     {
         if (!NavMesh.SamplePosition(worldTarget, out var hit, 3f, NavMesh.AllAreas)) return false;
-
         bool ok = NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, pathCache);
-        if (!ok || pathCache.status != NavMeshPathStatus.PathComplete)
-        {
-            if (NavMesh.SamplePosition(transform.position, out var from, 2f, NavMesh.AllAreas))
-            {
-                if (NavMesh.Raycast(from.position, hit.position, out var rh, NavMesh.AllAreas))
-                {
-                    Vector3 detour = SideDetour(rh.position);
-                    if (NavMesh.CalculatePath(transform.position, detour, NavMesh.AllAreas, pathCache) && pathCache.status == NavMeshPathStatus.PathComplete)
-                    {
-                        agent.SetPath(pathCache);
-                        lastSampledTarget = detour;
-                        lastRepathTime = Time.time;
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
+        if (!ok || pathCache.status != NavMeshPathStatus.PathComplete) return false;
         agent.SetPath(pathCache);
         lastSampledTarget = hit.position;
         lastRepathTime = Time.time;
         return true;
     }
 
-    Vector3 SideDetour(Vector3 around)
-    {
-        Vector3 from = transform.position;
-        Vector3 fwd = around - from; fwd.y = 0f;
-        if (fwd.sqrMagnitude < 0.001f) fwd = transform.forward;
-        fwd.Normalize();
-        Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
-        Vector3 a = from + fwd * 1.5f + right * 2f;
-        Vector3 b = from + fwd * 1.5f - right * 2f;
-        if (NavMesh.SamplePosition(a, out var ha, 2f, NavMesh.AllAreas)) return ha.position;
-        if (NavMesh.SamplePosition(b, out var hb, 2f, NavMesh.AllAreas)) return hb.position;
-        return from;
-    }
-
     void DetectAndRecoverStuck()
     {
         if (Time.time - lastStuckCheck < stuckCheckInterval) return;
         lastStuckCheck = Time.time;
-
         if (agent.pathPending) return;
         if (!agent.hasPath) return;
         if (agent.remainingDistance <= agent.stoppingDistance) return;
-
         float rem = agent.remainingDistance;
         float progress = lastRemainingDist <= 0f ? 1f : lastRemainingDist - rem;
         lastRemainingDist = rem;
-
         bool barelyMoving = agent.velocity.sqrMagnitude < 0.01f && agent.desiredVelocity.sqrMagnitude < 0.01f;
         bool noProgress = progress < 0.01f;
-
         if (barelyMoving || noProgress)
         {
-            Vector3 goal = currentState == State.Chase ? player.position : currentGoal;
-            Vector3 detour = SideDetour(goal);
-            TrySetPathTo(detour);
+            Vector3 nudge = transform.position + transform.right * 1.5f;
+            if (!TrySetPathTo(nudge))
+            {
+                nudge = transform.position - transform.right * 1.5f;
+                TrySetPathTo(nudge);
+            }
         }
     }
 
@@ -278,15 +288,31 @@ public class EnemyAI : MonoBehaviour
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotateSpeedDeg * Time.deltaTime);
     }
 
-    Vector3 GetNextPatrolDestination()
+    Vector3 GetNextPatrolDestination(out Transform goalTransform)
     {
+        if (sequenceQueue.Count > 0)
+        {
+            goalTransform = sequenceQueue.Dequeue();
+            return SafeSample(goalTransform.position);
+        }
+
+        goalTransform = null;
         if (patrolPoints == null || patrolPoints.Length == 0) return transform.position;
-        if (patrolPoints.Length == 1) return SafeSample(patrolPoints[0].position);
+
+        if (patrolPoints.Length == 1)
+        {
+            currentPatrolIndex = 0;
+            goalTransform = patrolPoints[0];
+            return SafeSample(goalTransform.position);
+        }
+
         int nextIndex;
         do { nextIndex = Random.Range(0, patrolPoints.Length); }
         while (nextIndex == currentPatrolIndex);
+
         currentPatrolIndex = nextIndex;
-        return SafeSample(patrolPoints[currentPatrolIndex].position);
+        goalTransform = patrolPoints[currentPatrolIndex];
+        return SafeSample(goalTransform.position);
     }
 
     Vector3 SafeSample(Vector3 target)
