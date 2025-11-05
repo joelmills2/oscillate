@@ -47,12 +47,10 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float repathInterval = 0.25f;
     [SerializeField] float repathMoveThreshold = 0.75f;
 
-    [Header("Visual Debugging")]
-    public Renderer rend;
-    public Color idleColor = Color.green;
-    public Color patrolColor = Color.cyan;
-    public Color chaseColor = new Color(1f, 0.5f, 0f);
-    public Color attackColor = Color.red;
+    [Header("Visuals")]
+    [SerializeField] Material idlePatrolMat;
+    [SerializeField] Material chaseMat;
+    [SerializeField] Material attackMat;
 
     State currentState = State.Patrol;
     float nextFireTime;
@@ -68,14 +66,16 @@ public class EnemyAI : MonoBehaviour
     float lastRepathTime;
     Vector3 currentGoal;
 
+    SkinnedMeshRenderer[] ghostMeshes;
+
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
-        if (!rend) rend = GetComponentInChildren<Renderer>();
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = attackHoldDistance;
         agent.autoRepath = true;
         pathCache = new NavMeshPath();
+        ghostMeshes = GetComponentsInChildren<SkinnedMeshRenderer>();
         SetState(State.Patrol);
     }
 
@@ -158,7 +158,7 @@ public class EnemyAI : MonoBehaviour
         }
         else if (next == State.Patrol)
         {
-            agent.updateRotation = true;
+            agent.updateRotation = false;
             timeSinceLastSeen = 0f;
         }
         else if (next == State.Chase)
@@ -171,7 +171,16 @@ public class EnemyAI : MonoBehaviour
             nextFireTime = Time.time;
         }
 
-        ApplyColor(next);
+        ApplyMaterials(next);
+    }
+
+    void ApplyMaterials(State s)
+    {
+        Material m = idlePatrolMat;
+        if (s == State.Chase) m = chaseMat;
+        else if (s == State.Attack) m = attackMat;
+        if (ghostMeshes == null) return;
+        for (int i = 0; i < ghostMeshes.Length; i++) ghostMeshes[i].material = m;
     }
 
     bool RequireNewPath(Vector3 worldTarget)
@@ -254,16 +263,6 @@ public class EnemyAI : MonoBehaviour
         return true;
     }
 
-    void ApplyColor(State s)
-    {
-        if (!rend) return;
-        Color c = idleColor;
-        if (s == State.Patrol) c = patrolColor;
-        else if (s == State.Chase) c = chaseColor;
-        else if (s == State.Attack) c = attackColor;
-        rend.material.color = c;
-    }
-
     void OnValidate()
     {
         sqrAttackRange = attackRange * attackRange;
@@ -274,7 +273,6 @@ public class EnemyAI : MonoBehaviour
     {
         if (!agent || agent.path == null) return;
         if (agent.path.corners.Length < 2) return;
-
         Color pathColor = Color.white;
         switch (currentState)
         {
@@ -283,15 +281,11 @@ public class EnemyAI : MonoBehaviour
             case State.Attack: pathColor = Color.red; break;
             case State.Idle: pathColor = Color.green; break;
         }
-
         Gizmos.color = pathColor;
         Vector3[] corners = agent.path.corners;
-        for (int i = 0; i < corners.Length - 1; i++)
-            Gizmos.DrawLine(corners[i], corners[i + 1]);
-
+        for (int i = 0; i < corners.Length - 1; i++) Gizmos.DrawLine(corners[i], corners[i + 1]);
         Gizmos.color = Color.yellow;
         Gizmos.DrawSphere(agent.destination, 0.25f);
-
         Gizmos.color = Color.white;
         Gizmos.DrawLine(transform.position, agent.destination);
     }
