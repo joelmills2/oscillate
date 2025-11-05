@@ -1,11 +1,9 @@
 using UnityEngine;
 using UnityEngine.AI;
-using System.Collections.Generic;
 
 public class EnemyAI : MonoBehaviour
 {
     public enum State { Idle, Patrol, Chase, Attack }
-    enum SequencePhase { None, Forward, Backward }
 
     [Header("References")]
     [SerializeField] Transform player;
@@ -45,9 +43,13 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float projectileSpeed = 25f;
     [SerializeField] float spawnOffset = 0.4f;
 
-    [Header("Sequence Trigger")]
-    [SerializeField] string sequenceTriggerName = "PWcave1";
-    [SerializeField] Transform[] sequenceOrder;
+    [Header("Pathfinding")]
+    [SerializeField] float sampleMaxDistance = 3f;
+    [SerializeField] float reachableSearchRadius = 12f;
+    [SerializeField] int reachableRings = 3;
+    [SerializeField] int samplesPerRing = 8;
+    [SerializeField] float repathInterval = 0.25f;
+    [SerializeField] float repathMoveThreshold = 0.75f;
 
     [Header("Visual Debugging")]
     public Renderer rend;
@@ -57,8 +59,6 @@ public class EnemyAI : MonoBehaviour
     public Color attackColor = Color.red;
 
     State currentState = State.Idle;
-    SequencePhase seqPhase = SequencePhase.None;
-
     float nextFireTime;
     float sqrAttackRange;
     float timeSinceLastSeen;
@@ -71,16 +71,10 @@ public class EnemyAI : MonoBehaviour
     NavMeshPath pathCache;
     Vector3 lastSampledTarget;
     float lastRepathTime;
-    float repathInterval = 0.2f;
-    float repathMoveThreshold = 0.5f;
-
     float lastStuckCheck;
-    float stuckCheckInterval = 0.4f;
+    float stuckCheckInterval = 0.5f;
     float lastRemainingDist;
     Vector3 currentGoal;
-
-    readonly Queue<Transform> sequenceQueue = new Queue<Transform>();
-    Transform lastAssignedGoalTransform;
 
     void Awake()
     {
@@ -121,9 +115,8 @@ public class EnemyAI : MonoBehaviour
                 agent.speed = patrolSpeed;
                 if (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance)
                 {
-                    OnReached(lastAssignedGoalTransform);
-                    currentGoal = GetNextPatrolDestination(out lastAssignedGoalTransform);
-                    TrySetPathTo(currentGoal);
+                    currentGoal = GetNextPatrolDestination();
+                    TryPathToSmart(currentGoal);
                 }
                 UpdateLook(true);
                 if (visible) SetState(State.Chase);
@@ -133,7 +126,7 @@ public class EnemyAI : MonoBehaviour
                 agent.isStopped = false;
                 agent.speed = chaseSpeed;
                 Vector3 tgt = player.position;
-                if (NeedRepath(tgt)) TrySetPathTo(tgt);
+                if (NeedRepath(tgt)) TryPathToSmart(tgt);
                 if (!visible && timeSinceLastSeen >= stayInChaseTime) SetState(State.Patrol);
                 if (inAttack) SetState(State.Attack);
                 break;
@@ -141,7 +134,7 @@ public class EnemyAI : MonoBehaviour
             case State.Attack:
                 agent.isStopped = false;
                 agent.speed = 0f;
-                agent.SetDestination(player.position);
+                TryPathToSmart(player.position);
                 Vector3 look = player.position; look.y = transform.position.y;
                 transform.LookAt(look);
                 if (Time.time >= nextFireTime) Fire();
@@ -188,67 +181,71 @@ public class EnemyAI : MonoBehaviour
         ApplyColor(next);
     }
 
-    void OnReached(Transform reached)
-    {
-        if (!reached) return;
-
-        if (seqPhase == SequencePhase.None && reached.name == sequenceTriggerName)
-        {
-            sequenceQueue.Clear();
-            if (sequenceOrder != null)
-            {
-                for (int i = 0; i < sequenceOrder.Length; i++)
-                    if (sequenceOrder[i] && sequenceOrder[i] != reached) sequenceQueue.Enqueue(sequenceOrder[i]);
-                if (sequenceQueue.Count > 0) seqPhase = SequencePhase.Forward;
-            }
-            return;
-        }
-
-        if (seqPhase == SequencePhase.Forward && sequenceQueue.Count == 0)
-        {
-            sequenceQueue.Clear();
-            if (sequenceOrder != null && sequenceOrder.Length > 0)
-            {
-                for (int i = sequenceOrder.Length - 1; i >= 0; i--)
-                    if (sequenceOrder[i]) sequenceQueue.Enqueue(sequenceOrder[i]);
-                Transform trigger = FindTriggerTransform();
-                if (trigger) sequenceQueue.Enqueue(trigger);
-                seqPhase = SequencePhase.Backward;
-            }
-            return;
-        }
-
-        if (seqPhase == SequencePhase.Backward && sequenceQueue.Count == 0 && reached.name == sequenceTriggerName)
-        {
-            seqPhase = SequencePhase.None;
-        }
-    }
-
-    Transform FindTriggerTransform()
-    {
-        if (patrolPoints == null) return null;
-        for (int i = 0; i < patrolPoints.Length; i++)
-            if (patrolPoints[i] && patrolPoints[i].name == sequenceTriggerName) return patrolPoints[i];
-        return null;
-    }
-
     bool NeedRepath(Vector3 worldTarget)
     {
         if (Time.time - lastRepathTime < repathInterval) return false;
-        if (!NavMesh.SamplePosition(worldTarget, out var hit, 2f, NavMesh.AllAreas)) return false;
+        if (!NavMesh.SamplePosition(worldTarget, out var hit, sampleMaxDistance, NavMesh.AllAreas)) return false;
         if ((hit.position - lastSampledTarget).sqrMagnitude < repathMoveThreshold * repathMoveThreshold) return false;
         return true;
     }
 
-    bool TrySetPathTo(Vector3 worldTarget)
+    bool TryPathToSmart(Vector3 worldTarget)
     {
-        if (!NavMesh.SamplePosition(worldTarget, out var hit, 3f, NavMesh.AllAreas)) return false;
-        bool ok = NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, pathCache);
-        if (!ok || pathCache.status != NavMeshPathStatus.PathComplete) return false;
+        if (TryPathDirect(worldTarget)) return true;
+        if (TryPathToReachableNear(worldTarget)) return true;
+        if (TryPathViaRaycastDetour(worldTarget)) return true;
+        return false;
+    }
+
+    bool TryPathDirect(Vector3 worldTarget)
+    {
+        if (!NavMesh.SamplePosition(worldTarget, out var hit, sampleMaxDistance, NavMesh.AllAreas)) return false;
+        if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, pathCache)) return false;
+        if (pathCache.status != NavMeshPathStatus.PathComplete) return false;
         agent.SetPath(pathCache);
         lastSampledTarget = hit.position;
         lastRepathTime = Time.time;
         return true;
+    }
+
+    bool TryPathToReachableNear(Vector3 worldTarget)
+    {
+        float ringStep = Mathf.Max(0.01f, reachableSearchRadius / Mathf.Max(1, reachableRings));
+        for (int r = 1; r <= reachableRings; r++)
+        {
+            float radius = r * ringStep;
+            for (int i = 0; i < samplesPerRing; i++)
+            {
+                float ang = (i / (float)samplesPerRing) * Mathf.PI * 2f;
+                Vector3 p = worldTarget + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * radius;
+                if (!NavMesh.SamplePosition(p, out var hit, sampleMaxDistance, NavMesh.AllAreas)) continue;
+                if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, pathCache)) continue;
+                if (pathCache.status != NavMeshPathStatus.PathComplete) continue;
+                agent.SetPath(pathCache);
+                lastSampledTarget = hit.position;
+                lastRepathTime = Time.time;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool TryPathViaRaycastDetour(Vector3 worldTarget)
+    {
+        if (!NavMesh.SamplePosition(transform.position, out var from, sampleMaxDistance, NavMesh.AllAreas)) return false;
+        Vector3 to = worldTarget;
+        if (NavMesh.SamplePosition(worldTarget, out var hit, sampleMaxDistance, NavMesh.AllAreas)) to = hit.position;
+        if (!NavMesh.Raycast(from.position, to, out var rh, NavMesh.AllAreas)) return false;
+        Vector3 fwd = (rh.position - transform.position);
+        fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.001f) fwd = transform.forward;
+        fwd.Normalize();
+        Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
+        Vector3 a = rh.position + right * 2f;
+        Vector3 b = rh.position - right * 2f;
+        if (TryPathDirect(a)) return true;
+        if (TryPathDirect(b)) return true;
+        return false;
     }
 
     void DetectAndRecoverStuck()
@@ -266,11 +263,7 @@ public class EnemyAI : MonoBehaviour
         if (barelyMoving || noProgress)
         {
             Vector3 nudge = transform.position + transform.right * 1.5f;
-            if (!TrySetPathTo(nudge))
-            {
-                nudge = transform.position - transform.right * 1.5f;
-                TrySetPathTo(nudge);
-            }
+            if (!TryPathDirect(nudge)) TryPathDirect(transform.position - transform.right * 1.5f);
         }
     }
 
@@ -288,36 +281,20 @@ public class EnemyAI : MonoBehaviour
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotateSpeedDeg * Time.deltaTime);
     }
 
-    Vector3 GetNextPatrolDestination(out Transform goalTransform)
+    Vector3 GetNextPatrolDestination()
     {
-        if (sequenceQueue.Count > 0)
-        {
-            goalTransform = sequenceQueue.Dequeue();
-            return SafeSample(goalTransform.position);
-        }
-
-        goalTransform = null;
         if (patrolPoints == null || patrolPoints.Length == 0) return transform.position;
-
-        if (patrolPoints.Length == 1)
-        {
-            currentPatrolIndex = 0;
-            goalTransform = patrolPoints[0];
-            return SafeSample(goalTransform.position);
-        }
-
+        if (patrolPoints.Length == 1) return SafeSample(patrolPoints[0].position);
         int nextIndex;
         do { nextIndex = Random.Range(0, patrolPoints.Length); }
         while (nextIndex == currentPatrolIndex);
-
         currentPatrolIndex = nextIndex;
-        goalTransform = patrolPoints[currentPatrolIndex];
-        return SafeSample(goalTransform.position);
+        return SafeSample(patrolPoints[currentPatrolIndex].position);
     }
 
     Vector3 SafeSample(Vector3 target)
     {
-        if (NavMesh.SamplePosition(target, out var hit, 2f, NavMesh.AllAreas)) return hit.position;
+        if (NavMesh.SamplePosition(target, out var hit, sampleMaxDistance, NavMesh.AllAreas)) return hit.position;
         return target;
     }
 
@@ -365,5 +342,34 @@ public class EnemyAI : MonoBehaviour
     {
         sqrAttackRange = attackRange * attackRange;
         if (agent) agent.stoppingDistance = attackHoldDistance;
+    }
+
+    // ============================
+    //  GIZMO DEBUG VISUALIZATION
+    // ============================
+    void OnDrawGizmos()
+    {
+        if (!agent || agent.path == null) return;
+        if (agent.path.corners.Length < 2) return;
+
+        Color pathColor = Color.white;
+        switch (currentState)
+        {
+            case State.Patrol: pathColor = Color.cyan; break;
+            case State.Chase: pathColor = new Color(1f, 0.5f, 0f); break;
+            case State.Attack: pathColor = Color.red; break;
+            case State.Idle: pathColor = Color.green; break;
+        }
+
+        Gizmos.color = pathColor;
+        Vector3[] corners = agent.path.corners;
+        for (int i = 0; i < corners.Length - 1; i++)
+            Gizmos.DrawLine(corners[i], corners[i + 1]);
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawSphere(agent.destination, 0.25f);
+
+        Gizmos.color = Color.white;
+        Gizmos.DrawLine(transform.position, agent.destination);
     }
 }
