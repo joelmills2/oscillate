@@ -8,6 +8,7 @@
 // https://www.gamedeveloper.com/
 // https://learn.unity.com/project/navigation-and-pathfinding
 // https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html
+// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMesh.html
 
 using UnityEngine;
 using UnityEngine.AI;
