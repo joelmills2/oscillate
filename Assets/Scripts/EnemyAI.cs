@@ -1,3 +1,14 @@
+// Sources:
+// https://learn.unity.com/tutorial/introduction-to-navmesh-agents
+// https://docs.unity3d.com/ScriptReference/AI.NavMesh.SamplePosition.html
+// https://docs.unity3d.com/6000.2/Documentation/ScriptReference/AI.NavMeshAgent.Raycast.html
+// https://discussions.unity.com/t/beginner-question-regarding-ai-view-radius-and-line-of-sight/765569
+// https://www.youtube.com/watch?v=znZXmmyBF-o
+// https://www.youtube.com/watch?v=UjkSFoLxesw
+// https://www.gamedeveloper.com/
+// https://learn.unity.com/project/navigation-and-pathfinding
+// https://docs.unity3d.com/Manual/nav-BuildingNavMesh.html
+
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -98,7 +109,7 @@ public class EnemyAI : MonoBehaviour
                 else if (idleTimer <= 0f)
                 {
                     currentGoal = GetNextPatrolDestination();
-                    SmartPath(currentGoal);
+                    SmartPathToNextPatrolPoint(currentGoal);
                     SetState(State.Patrol);
                 }
                 UpdateLook(true);
@@ -110,7 +121,7 @@ public class EnemyAI : MonoBehaviour
                 if (!agent.hasPath)
                 {
                     currentGoal = GetNextPatrolDestination();
-                    SmartPath(currentGoal);
+                    SmartPathToNextPatrolPoint(currentGoal);
                 }
                 if (agent.hasPath && agent.remainingDistance <= agent.stoppingDistance)
                 {
@@ -124,7 +135,7 @@ public class EnemyAI : MonoBehaviour
                 agent.isStopped = false;
                 agent.speed = chaseSpeed;
                 Vector3 tgt = player.position;
-                if (RequireNewPath(tgt)) SmartPath(tgt);
+                if (RequireNewPath(tgt)) SmartPathToNextPatrolPoint(tgt);
                 if (!visible && timeSinceLastSeen >= stayInChaseTime) SetState(State.Patrol);
                 if (inAttack) SetState(State.Attack);
                 break;
@@ -132,7 +143,7 @@ public class EnemyAI : MonoBehaviour
             case State.Attack:
                 agent.isStopped = false;
                 agent.speed = 0f;
-                SmartPath(player.position);
+                SmartPathToNextPatrolPoint(player.position);
                 Vector3 look = player.position; look.y = transform.position.y;
                 transform.LookAt(look);
                 if (Time.time >= nextFireTime) Fire();
@@ -191,7 +202,7 @@ public class EnemyAI : MonoBehaviour
         return true;
     }
 
-    bool SmartPath(Vector3 worldTarget)
+    bool SmartPathToNextPatrolPoint(Vector3 worldTarget)
     {
         if (!NavMesh.SamplePosition(worldTarget, out var hit, sampleMaxDistance, NavMesh.AllAreas)) return false;
         if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, pathCache)) return false;
