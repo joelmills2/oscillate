@@ -12,13 +12,14 @@
 
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.Netcode;
 
-public class EnemyAI : MonoBehaviour
+public class EnemyAI : NetworkBehaviour
 {
     public enum State { Idle, Patrol, Chase, Attack }
 
     [Header("References")]
-    [SerializeField] Transform player;
+    [SerializeField] Transform[] playerCandidates;
     [SerializeField] NavMeshAgent agent;
 
     [Header("Ranges")]
@@ -80,6 +81,8 @@ public class EnemyAI : MonoBehaviour
 
     SkinnedMeshRenderer[] ghostMeshes;
 
+    Transform currentTarget;
+
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
@@ -93,12 +96,35 @@ public class EnemyAI : MonoBehaviour
 
     void Update()
     {
-        if (!player) return;
 
-        bool visible = CanSeePlayer();
-        if (visible) timeSinceLastSeen = 0f; else timeSinceLastSeen += Time.deltaTime;
+        if (!IsServer) return;
 
-        float sqrDist = (player.position - transform.position).sqrMagnitude;
+        currentTarget = SelectBestTarget();
+
+        if (!currentTarget)
+        {
+            if (currentState != State.Patrol && currentState != State.Idle)
+                SetState(State.Patrol);
+
+            agent.isStopped = false;
+            agent.speed = patrolSpeed;
+            if (!agent.hasPath)
+            {
+                currentGoal = GetNextPatrolDestination();
+                SmartPathToNextPatrolPoint(currentGoal);
+            }
+            UpdateLook(true);
+
+            Vector3 pvel = agent.desiredVelocity; pvel.y = 0f;
+            if (pvel.sqrMagnitude > 0.01f) lastMoveDir = pvel.normalized;
+            return;
+        }
+
+        bool visible = CanSeeTarget(currentTarget);
+        if (visible) timeSinceLastSeen = 0f;
+        else         timeSinceLastSeen += Time.deltaTime;
+
+        float sqrDist = (currentTarget.position - transform.position).sqrMagnitude;
         bool inAttack = sqrDist <= sqrAttackRange;
 
         switch (currentState)
@@ -135,7 +161,7 @@ public class EnemyAI : MonoBehaviour
             case State.Chase:
                 agent.isStopped = false;
                 agent.speed = chaseSpeed;
-                Vector3 tgt = player.position;
+                Vector3 tgt = currentTarget.position;
                 if (RequireNewPath(tgt)) SmartPathToNextPatrolPoint(tgt);
                 if (!visible && timeSinceLastSeen >= stayInChaseTime) SetState(State.Patrol);
                 if (inAttack) SetState(State.Attack);
@@ -144,8 +170,8 @@ public class EnemyAI : MonoBehaviour
             case State.Attack:
                 agent.isStopped = false;
                 agent.speed = 0f;
-                SmartPathToNextPatrolPoint(player.position);
-                Vector3 look = player.position; look.y = transform.position.y;
+                SmartPathToNextPatrolPoint(currentTarget.position);
+                Vector3 look = currentTarget.position; look.y = transform.position.y;
                 transform.LookAt(look);
                 if (Time.time >= nextFireTime) Fire();
                 if (!visible) SetState(State.Patrol);
@@ -247,10 +273,20 @@ public class EnemyAI : MonoBehaviour
 
     void Fire()
     {
-        if (!projectilePrefab || !firePoint || !player) return;
-        Vector3 dir = (player.position - firePoint.position).normalized;
+        if (!IsServer) return;
+        if (!projectilePrefab || !firePoint || !currentTarget) return;
+
+        Vector3 dir = (currentTarget.position - firePoint.position).normalized;
         Vector3 spawnPos = firePoint.position + dir * spawnOffset;
+
         var proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
+
+        var netObj = proj.GetComponent<NetworkObject>();
+        if (netObj != null)
+        {
+            netObj.Spawn();
+        }
+
         var rb = proj.GetComponent<Rigidbody>();
         var p = proj.GetComponent<Projectile>();
         if (p != null)
@@ -262,16 +298,19 @@ public class EnemyAI : MonoBehaviour
         nextFireTime = Time.time + fireCooldown;
     }
 
-    bool CanSeePlayer()
+    bool CanSeeTarget(Transform targetTransform)
     {
-        if (!player) return false;
+        if (!targetTransform) return false;
+
         Vector3 origin = transform.position + Vector3.up * eyeHeight;
-        Vector3 target = player.position;
+        Vector3 target = targetTransform.position;
         Vector3 dir = (target - origin).normalized;
         float dist = Vector3.Distance(origin, target);
+
         if (dist > detectRange) return false;
         if (Vector3.Angle(transform.forward, dir) > viewAngle * 0.5f) return false;
         if (Physics.Raycast(origin, dir, dist, obstacleMask)) return false;
+
         return true;
     }
 
@@ -300,5 +339,43 @@ public class EnemyAI : MonoBehaviour
         Gizmos.DrawSphere(agent.destination, 0.25f);
         Gizmos.color = Color.white;
         Gizmos.DrawLine(transform.position, agent.destination);
+    }
+
+    Transform SelectBestTarget()
+    {
+        Transform best = null;
+        float bestSqrDist = float.PositiveInfinity;
+
+        if (NetworkPlayer.ServerPlayers.Count > 0)
+        {
+            foreach (var np in NetworkPlayer.ServerPlayers)
+            {
+                if (!np || !np.IsSpawned) continue;
+                Transform t = np.transform;
+                float sqrDist = (t.position - transform.position).sqrMagnitude;
+                if (sqrDist < bestSqrDist)
+                {
+                    bestSqrDist = sqrDist;
+                    best = t;
+                }
+            }
+        }   
+        else if (playerCandidates != null)
+        {
+            for (int i = 0; i < playerCandidates.Length; i++)
+            {
+                Transform t = playerCandidates[i];
+                if (!t) continue;
+
+                float sqrDist = (t.position - transform.position).sqrMagnitude;
+                if (sqrDist < bestSqrDist)
+                {
+                    bestSqrDist = sqrDist;
+                    best = t;
+                }
+            }
+        }
+
+        return best;
     }
 }

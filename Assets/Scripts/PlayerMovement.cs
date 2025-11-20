@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
 [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
     [SerializeField] private InputActionReference moveAction;
     [SerializeField] private InputActionReference jumpAction;
@@ -14,8 +15,8 @@ public class PlayerMovement : MonoBehaviour
 
     [SerializeField] private float fallMultiplier = 2.5f;
 
-    Rigidbody rb;
-    bool jumpPressed;
+    private Rigidbody rb;
+    private bool jumpPressed;
 
     void Awake()
     {
@@ -39,12 +40,24 @@ public class PlayerMovement : MonoBehaviour
 
     void Update()
     {
-        if (jumpAction.action.WasPressedThisFrame()) jumpPressed = true;
+        // Only the local owner should read input
+        if (!IsOwner) return;
+
+        if (jumpAction.action.WasPressedThisFrame())
+            jumpPressed = true;
     }
 
     void FixedUpdate()
     {
-        bool grounded = Physics.CheckSphere(groundCheck.position, groundRadius, groundMask, QueryTriggerInteraction.Ignore);
+        // Only the local owner should control velocity
+        if (!IsOwner) return;
+
+        bool grounded = Physics.CheckSphere(
+            groundCheck.position,
+            groundRadius,
+            groundMask,
+            QueryTriggerInteraction.Ignore
+        );
 
         if (!grounded)
         {
@@ -65,5 +78,11 @@ public class PlayerMovement : MonoBehaviour
 
         rb.linearVelocity = v;
         jumpPressed = false;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        Debug.Log($"{name} spawned. OwnerClientId={OwnerClientId}, IsOwner={IsOwner}, IsClient={IsClient}");
     }
 }
