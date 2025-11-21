@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class NetworkPlayer : NetworkBehaviour
 {
-    // Server-side list of all players
     public static readonly List<NetworkPlayer> ServerPlayers = new List<NetworkPlayer>();
 
     public override void OnNetworkSpawn()

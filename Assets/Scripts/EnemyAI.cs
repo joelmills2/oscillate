@@ -23,13 +23,13 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] NavMeshAgent agent;
 
     [Header("Ranges")]
-    [SerializeField] float detectRange = 30f;
+    [SerializeField] float detectRange = 40f;
     [SerializeField] float attackRange = 12f;
     [SerializeField] float attackHoldDistance = 8f;
 
     [Header("Speeds")]
-    [SerializeField] float patrolSpeed = 4.5f;
-    [SerializeField] float chaseSpeed = 10f;
+    [SerializeField] float patrolSpeed = 10f;
+    [SerializeField] float chaseSpeed = 8.5f;
 
     [Header("Timers")]
     [SerializeField] float fireCooldown = 0.75f;
@@ -40,7 +40,7 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] Transform[] patrolPoints;
 
     [Header("Line of Sight")]
-    [SerializeField] float viewAngle = 60f;
+    [SerializeField] float viewAngle = 120f;
     [SerializeField] float eyeHeight = 1.6f;
     [SerializeField] LayerMask obstacleMask;
 
@@ -122,7 +122,7 @@ public class EnemyAI : NetworkBehaviour
 
         bool visible = CanSeeTarget(currentTarget);
         if (visible) timeSinceLastSeen = 0f;
-        else         timeSinceLastSeen += Time.deltaTime;
+        else timeSinceLastSeen += Time.deltaTime;
 
         float sqrDist = (currentTarget.position - transform.position).sqrMagnitude;
         bool inAttack = sqrDist <= sqrAttackRange;
@@ -166,17 +166,42 @@ public class EnemyAI : NetworkBehaviour
                 if (!visible && timeSinceLastSeen >= stayInChaseTime) SetState(State.Patrol);
                 if (inAttack) SetState(State.Attack);
                 break;
-
             case State.Attack:
-                agent.isStopped = false;
-                agent.speed = 0f;
-                SmartPathToNextPatrolPoint(currentTarget.position);
-                Vector3 look = currentTarget.position; look.y = transform.position.y;
+            {
+                float dist = Mathf.Sqrt(sqrDist);
+
+                if (dist < attackHoldDistance)
+                {
+                    agent.isStopped = false;
+                    agent.speed = chaseSpeed;
+
+                    Vector3 toTarget = currentTarget.position - transform.position;
+                    toTarget.y = 0f;
+                    if (toTarget.sqrMagnitude < 0.001f)
+                        toTarget = transform.forward;
+
+                    Vector3 awayDir = -toTarget.normalized;
+                    agent.Move(awayDir * chaseSpeed * Time.deltaTime);
+                }
+                else
+                {
+                    agent.isStopped = true;
+                    agent.speed = 0f;
+                    agent.ResetPath();
+                }
+
+                Vector3 look = currentTarget.position;
+                look.y = transform.position.y;
                 transform.LookAt(look);
-                if (Time.time >= nextFireTime) Fire();
-                if (!visible) SetState(State.Patrol);
-                else if (!inAttack) SetState(State.Chase);
+
+                if (Time.time >= nextFireTime)
+                    Fire();
+
+                if (!inAttack)
+                    SetState(State.Chase);
+
                 break;
+            }
         }
 
         Vector3 vel = agent.desiredVelocity; vel.y = 0f;
@@ -210,6 +235,11 @@ public class EnemyAI : NetworkBehaviour
         }
 
         ApplyMaterials(next);
+
+        if (IsServer && IsSpawned)
+        {
+            ApplyMaterialsClientRpc(next);
+        }
     }
 
     void ApplyMaterials(State s)
@@ -346,21 +376,22 @@ public class EnemyAI : NetworkBehaviour
         Transform best = null;
         float bestSqrDist = float.PositiveInfinity;
 
-        if (NetworkPlayer.ServerPlayers.Count > 0)
+        foreach (var np in NetworkPlayer.ServerPlayers)
         {
-            foreach (var np in NetworkPlayer.ServerPlayers)
+            if (np == null || !np.IsSpawned)
+                continue;
+
+            Transform t = np.transform;
+            float sqrDist = (t.position - transform.position).sqrMagnitude;
+
+            if (sqrDist < bestSqrDist)
             {
-                if (!np || !np.IsSpawned) continue;
-                Transform t = np.transform;
-                float sqrDist = (t.position - transform.position).sqrMagnitude;
-                if (sqrDist < bestSqrDist)
-                {
-                    bestSqrDist = sqrDist;
-                    best = t;
-                }
+                bestSqrDist = sqrDist;
+                best = t;
             }
-        }   
-        else if (playerCandidates != null)
+        }
+
+        if (best == null && playerCandidates != null && playerCandidates.Length > 0)
         {
             for (int i = 0; i < playerCandidates.Length; i++)
             {
@@ -375,7 +406,13 @@ public class EnemyAI : NetworkBehaviour
                 }
             }
         }
-
         return best;
+    }
+
+    [ClientRpc]
+    void ApplyMaterialsClientRpc(State s)
+    {
+        if (IsServer) return;
+        ApplyMaterials(s);
     }
 }

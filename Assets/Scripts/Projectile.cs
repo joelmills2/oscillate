@@ -1,9 +1,12 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class Projectile : MonoBehaviour
+public class Projectile : NetworkBehaviour
 {
     [SerializeField] float lifeSeconds = 5f;
-    Collider selfCol;
+
+    private Collider selfCol;
+    private float lifeTimer;
 
     void Awake()
     {
@@ -12,16 +15,46 @@ public class Projectile : MonoBehaviour
 
     public void Init(Collider[] ignoreThese)
     {
-        if (selfCol == null) selfCol = GetComponent<Collider>();
+        if (selfCol == null)
+            selfCol = GetComponent<Collider>();
+
         for (int i = 0; i < ignoreThese.Length; i++)
         {
-            if (ignoreThese[i] && selfCol) Physics.IgnoreCollision(selfCol, ignoreThese[i], true);
+            if (ignoreThese[i] && selfCol)
+            {
+                Physics.IgnoreCollision(selfCol, ignoreThese[i], true);
+            }
         }
-        Destroy(gameObject, lifeSeconds);
+    }
+
+    void Update()
+    {
+        if (!IsServer) return;
+
+        lifeTimer += Time.deltaTime;
+        if (lifeTimer >= lifeSeconds)
+        {
+            DespawnProjectile();
+        }
     }
 
     void OnCollisionEnter(Collision c)
     {
-        Destroy(gameObject);
+        if (!IsServer) return;
+
+        DespawnProjectile();
+    }
+
+    private void DespawnProjectile()
+    {
+        var netObj = GetComponent<NetworkObject>();
+        if (netObj != null && netObj.IsSpawned)
+        {
+            netObj.Despawn(true); 
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }

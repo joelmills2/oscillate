@@ -9,7 +9,7 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] private InputActionReference jumpAction;
     [SerializeField] private Transform groundCheck;
     [SerializeField] private LayerMask groundMask;
-    [SerializeField] private float speed = 6f;
+    [SerializeField] private float speed = 12f;
     [SerializeField] private float jumpHeight = 1.5f;
     [SerializeField] private float groundRadius = 0.3f;
 

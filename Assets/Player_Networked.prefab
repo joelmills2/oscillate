@@ -144,7 +144,7 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 8
-  speed: 10
+  speed: 12
   jumpHeight: 6
   groundRadius: 0.3
   fallMultiplier: 2.5
@@ -184,8 +184,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ClientOwnerEnable
   ShowTopMostFoldoutHeaderGroup: 1
-  playerMovement: {fileID: 1862655809241443897}
-  playerInput: {fileID: 0}
   cameraController: {fileID: 0}
   playerCamera: {fileID: 1409700929983622699}
   audioListener: {fileID: 8513116327376397145}
