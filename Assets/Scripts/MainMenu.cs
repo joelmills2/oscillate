@@ -4,34 +4,96 @@ Menu system adapted from: https://www.youtube.com/watch?v=76WOa6IU_s8
 
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Unity.Netcode;
+using TMPro;
+// using Unity.Netcode.Transports.UTP; // uncomment later if you want custom IP/port
 
 public class MainMenu : MonoBehaviour
 {
-    public string gameScene;
+    [Header("Scenes")]
+    [SerializeField] private string gameScene = "PathfindingScene";
+
+    [SerializeField] private TMP_InputField playerNameInput;
+
+    // [SerializeField] private TMP_InputField ipInputField;
+
+    private NetworkManager Net => NetworkManager.Singleton;
+
+    public GameObject optionsScreen;
 
     public void StartHost()
     {
-        SceneManager.LoadScene(gameScene);
+        if (Net == null)
+        {
+            Debug.LogError("No NetworkManager in the Main Menu scene.");
+            return;
+        }
+
+        CachePlayerName();
+
+        bool started = Net.StartHost();
+        if (!started)
+        {
+            Debug.LogError("Failed to start host.");
+            // UpdateStatus("Failed to start host.");
+            return;
+        }
+
+        // Host controls scene changes. This will move everyone into PathfindingScene.
+        Net.SceneManager.LoadScene(gameScene, LoadSceneMode.Single);
+        Debug.Log("Host started, loading scene: " + gameScene);
+        // UpdateStatus("Hosting game...");
     }
 
     public void StartClient()
     {
-        SceneManager.LoadScene(gameScene);
+        if (Net == null)
+        {
+            Debug.LogError("No NetworkManager in the Main Menu scene.");
+            return;
+        }
+
+        CachePlayerName();
+
+        // var utp = (UnityTransport)Net.NetworkConfig.NetworkTransport;
+        // utp.ConnectionData.Address = ipInputField.text;
+
+        bool started = Net.StartClient();
+        if (!started)
+        {
+            Debug.LogError("Failed to start client.");
+            return;
+        }
+
+        Debug.Log("Client starting and connecting to host.");
     }
 
     public void OpenOptions()
     {
-        
+        optionsScreen.SetActive(true);
     }
 
     public void CloseOptions()
     {
-        
+        optionsScreen.SetActive(false);
     }
 
     public void QuitGame()
     {
         Application.Quit();
         Debug.Log("Quitting Game");
+    }
+
+    private void CachePlayerName()
+    {
+        string name = "Player";
+
+        if (playerNameInput != null && !string.IsNullOrWhiteSpace(playerNameInput.text))
+        {
+            name = playerNameInput.text.Trim();
+        }
+
+        GameSession.LocalPlayerName = name;
+        Debug.Log("Local player name set to: " + name);
     }
 }

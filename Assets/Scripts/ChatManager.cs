@@ -38,7 +38,7 @@ public class ChatManager : NetworkBehaviour
 
         if (!string.IsNullOrWhiteSpace(chatInput.text))
         {
-            SendChatMessage(chatInput.text, playerName);
+            SendChatMessage(chatInput.text);
             chatInput.text = "";
         }
 
@@ -49,7 +49,12 @@ public class ChatManager : NetworkBehaviour
     {
         if (string.IsNullOrWhiteSpace(message)) return;
 
-        string s = fromWho + " > " + message;
+        string name = !string.IsNullOrWhiteSpace(fromWho) ? fromWho : playerName;
+
+        if (string.IsNullOrWhiteSpace(name))
+            name = "Player " + NetworkManager.Singleton.LocalClientId;
+
+        string s = name + " > " + message;
         SendChatMessageServerRpc(s);
     }
 
@@ -76,13 +81,18 @@ public class ChatManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (IsClient)
-            playerName = "Player " + NetworkManager.Singleton.LocalClientId;
+        if (!IsClient) return;
+
+        string name = GameSession.LocalPlayerName;
+        if (string.IsNullOrWhiteSpace(name))
+            name = "Player " + NetworkManager.Singleton.LocalClientId;
+
+        playerName = name;
+        Debug.Log($"ChatManager name set to {playerName} for client {NetworkManager.Singleton.LocalClientId}");
     }
 
     public bool IsTyping
     {
         get { return chatInput != null && chatInput.isFocused; }
     }
-
 }
