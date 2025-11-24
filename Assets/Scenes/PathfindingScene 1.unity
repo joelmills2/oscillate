@@ -1442,20 +1442,6 @@ Animator:
   m_CorrespondingSourceObject: {fileID: 6007180743642840525, guid: 5a796ed211b2cec468ecadad11acb207, type: 3}
   m_PrefabInstance: {fileID: 484528076}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &179989258
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 179989250}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23979b46819e14e4bad5cdeef65a45b8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hitbox
-  health: {fileID: 863566117}
-  damageMultiplier: 1
 --- !u!1 &182172508
 GameObject:
   m_ObjectHideFlags: 0
@@ -7378,9 +7364,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6007180743642840513, guid: 5a796ed211b2cec468ecadad11acb207, type: 3}
       insertIndex: -1
       addedObject: {fileID: 179989254}
-    - targetCorrespondingSourceObject: {fileID: 6007180743642840513, guid: 5a796ed211b2cec468ecadad11acb207, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 179989258}
   m_SourcePrefab: {fileID: 100100000, guid: 5a796ed211b2cec468ecadad11acb207, type: 3}
 --- !u!1001 &486551526
 PrefabInstance:
@@ -13292,14 +13275,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 863566111}
-  - component: {fileID: 863566113}
-  - component: {fileID: 863566112}
   - component: {fileID: 863566110}
   - component: {fileID: 863566116}
   - component: {fileID: 863566115}
   - component: {fileID: 863566114}
-  - component: {fileID: 863566117}
-  - component: {fileID: 863566118}
+  - component: {fileID: 863566113}
+  - component: {fileID: 863566112}
   m_Layer: 0
   m_Name: Enemy_Networked
   m_TagString: Untagged
@@ -13428,20 +13409,20 @@ MonoBehaviour:
   - {fileID: 1223966142}
   - {fileID: 233367742}
   - {fileID: 1154136828}
-  viewAngle: 160
+  viewAngle: 120
   eyeHeight: 1.6
   obstacleMask:
     serializedVersion: 2
     m_Bits: 64
-  lookYawAmplitude: 85
-  lookYawSpeed: 0.75
+  lookYawAmplitude: 45
+  lookYawSpeed: 0.6
   rotateSpeedDeg: 360
   projectilePrefab: {fileID: 1042537894055597679, guid: 69881e06fd855a34282d7b96b6e8ff2d, type: 3}
   firePoint: {fileID: 1379425735}
   projectileSpeed: 25
   spawnOffset: 0.4
-  sampleMaxDistance: 5
-  repathInterval: 0.1
+  sampleMaxDistance: 3
+  repathInterval: 0.25
   repathMoveThreshold: 0.75
   idlePatrolMat: {fileID: 2100000, guid: 77f4bbfb2a114074ba93cc6ecac503ef, type: 2}
   chaseMat: {fileID: 2100000, guid: 7ccd65bab498679439453235e6edb246, type: 2}
@@ -13507,37 +13488,6 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!114 &863566117
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 863566109}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f16be0cdf2cf744f5b77bc7b0a7507bb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Health
-  ShowTopMostFoldoutHeaderGroup: 1
-  maxHealth: 20
-  CurrentHealth:
-    m_InternalValue: 0
---- !u!114 &863566118
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 863566109}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40762d45abd244975873df907d25c167, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyLife
-  ShowTopMostFoldoutHeaderGroup: 1
-  nextVariantPrefab: {fileID: 0}
-  replaceDelay: 1
 --- !u!1001 &867800978
 PrefabInstance:
   m_ObjectHideFlags: 0

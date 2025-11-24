@@ -45,8 +45,8 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] LayerMask obstacleMask;
 
     [Header("Look Behaviour")]
-    [SerializeField] float lookYawAmplitude = 45f;
-    [SerializeField] float lookYawSpeed = 0.6f;
+    [SerializeField] float lookYawAmplitude = 85f;
+    [SerializeField] float lookYawSpeed = 0.75f;
     [SerializeField] float rotateSpeedDeg = 360f;
 
     [Header("Attack Settings")]
@@ -56,8 +56,8 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] float spawnOffset = 0.4f;
 
     [Header("Pathfinding")]
-    [SerializeField] float sampleMaxDistance = 3f;
-    [SerializeField] float repathInterval = 0.25f;
+    [SerializeField] float sampleMaxDistance = 5f;
+    [SerializeField] float repathInterval = 0.1f;
     [SerializeField] float repathMoveThreshold = 0.75f;
 
     [Header("Visuals")]
@@ -381,6 +381,10 @@ public class EnemyAI : NetworkBehaviour
             if (np == null || !np.IsSpawned)
                 continue;
 
+            Health h = np.GetComponent<Health>();
+            if (h != null && h.IsDead)
+                continue;
+
             Transform t = np.transform;
             float sqrDist = (t.position - transform.position).sqrMagnitude;
 
@@ -398,6 +402,10 @@ public class EnemyAI : NetworkBehaviour
                 Transform t = playerCandidates[i];
                 if (!t) continue;
 
+                Health h = t.GetComponent<Health>();
+                if (h != null && h.IsDead)
+                    continue;
+
                 float sqrDist = (t.position - transform.position).sqrMagnitude;
                 if (sqrDist < bestSqrDist)
                 {
@@ -406,8 +414,10 @@ public class EnemyAI : NetworkBehaviour
                 }
             }
         }
+
         return best;
     }
+
 
     [ClientRpc]
     void ApplyMaterialsClientRpc(State s)

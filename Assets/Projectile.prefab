@@ -182,6 +182,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   lifeSeconds: 5
+  damage: 1
 --- !u!114 &9206495612441766852
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -4,9 +4,10 @@ using Unity.Netcode;
 public class Projectile : NetworkBehaviour
 {
     [SerializeField] float lifeSeconds = 5f;
+    [SerializeField] int damage = 1;
 
-    private Collider selfCol;
-    private float lifeTimer;
+    Collider selfCol;
+    float lifeTimer;
 
     void Awake()
     {
@@ -42,15 +43,21 @@ public class Projectile : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        Hitbox hitbox = c.collider.GetComponent<Hitbox>();
+        if (hitbox != null)
+        {
+            hitbox.ApplyDamage(damage);
+        }
+
         DespawnProjectile();
     }
 
-    private void DespawnProjectile()
+    void DespawnProjectile()
     {
-        var netObj = GetComponent<NetworkObject>();
+        NetworkObject netObj = GetComponent<NetworkObject>();
         if (netObj != null && netObj.IsSpawned)
         {
-            netObj.Despawn(true); 
+            netObj.Despawn(true);
         }
         else
         {
