@@ -52,6 +52,9 @@ public class PlayerMovement : NetworkBehaviour
         // Only the local owner should control velocity
         if (!IsOwner) return;
 
+        if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
+            return;
+
         bool grounded = Physics.CheckSphere(
             groundCheck.position,
             groundRadius,

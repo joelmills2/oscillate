@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
-public class MouseLook : MonoBehaviour
+public class MouseLook : NetworkBehaviour
 {
     [SerializeField] private Transform playerBody;
     [SerializeField] private float sensitivity = 100f;
@@ -20,6 +21,11 @@ public class MouseLook : MonoBehaviour
 
     void Update()
     {
+        if (!IsOwner) return;
+
+        if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
+            return;
+
         Vector2 look = lookAction.action.ReadValue<Vector2>();
         float yaw = look.x * sensitivity * Time.deltaTime;
         float pitch = look.y * sensitivity * Time.deltaTime;

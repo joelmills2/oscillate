@@ -41,6 +41,8 @@ public class ChatManager : NetworkBehaviour
             SendChatMessage(chatInput.text, playerName);
             chatInput.text = "";
         }
+
+        chatInput.DeactivateInputField();
     }
 
     public void SendChatMessage(string message, string fromWho = null)
@@ -76,6 +78,11 @@ public class ChatManager : NetworkBehaviour
     {
         if (IsClient)
             playerName = "Player " + NetworkManager.Singleton.LocalClientId;
+    }
+
+    public bool IsTyping
+    {
+        get { return chatInput != null && chatInput.isFocused; }
     }
 
 }
