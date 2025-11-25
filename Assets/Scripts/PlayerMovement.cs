@@ -5,22 +5,23 @@ using Unity.Netcode;
 [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
 public class PlayerMovement : NetworkBehaviour
 {
-    [SerializeField] private InputActionReference moveAction;
-    [SerializeField] private InputActionReference jumpAction;
-    [SerializeField] private Transform groundCheck;
-    [SerializeField] private LayerMask groundMask;
-    [SerializeField] private float speed = 12f;
-    [SerializeField] private float jumpHeight = 1.5f;
-    [SerializeField] private float groundRadius = 0.3f;
+    [SerializeField] InputActionReference moveAction;
+    [SerializeField] InputActionReference jumpAction;
+    [SerializeField] Transform groundCheck;
+    [SerializeField] LayerMask groundMask;
+    [SerializeField] float speed = 12f;
+    [SerializeField] float jumpHeight = 1.5f;
+    [SerializeField] float groundRadius = 0.3f;
+    [SerializeField] float fallMultiplier = 2.5f;
 
-    [SerializeField] private float fallMultiplier = 2.5f;
-
-    private Rigidbody rb;
-    private bool jumpPressed;
+    Rigidbody rb;
+    Health health;
+    bool jumpPressed;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        health = GetComponent<Health>();
         rb.freezeRotation = true;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -41,6 +42,7 @@ public class PlayerMovement : NetworkBehaviour
     void Update()
     {
         if (!IsOwner) return;
+        if (health != null && health.IsDead) return;
 
         if (PauseMenu.GameIsPaused) return;
 
@@ -51,6 +53,7 @@ public class PlayerMovement : NetworkBehaviour
     void FixedUpdate()
     {
         if (!IsOwner) return;
+        if (health != null && health.IsDead) return;
 
         if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
             return;
