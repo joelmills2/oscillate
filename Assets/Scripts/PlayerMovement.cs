@@ -40,8 +40,9 @@ public class PlayerMovement : NetworkBehaviour
 
     void Update()
     {
-        // Only the local owner should read input
         if (!IsOwner) return;
+
+        if (PauseMenu.GameIsPaused) return;
 
         if (jumpAction.action.WasPressedThisFrame())
             jumpPressed = true;
@@ -49,7 +50,6 @@ public class PlayerMovement : NetworkBehaviour
 
     void FixedUpdate()
     {
-        // Only the local owner should control velocity
         if (!IsOwner) return;
 
         if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
@@ -86,6 +86,5 @@ public class PlayerMovement : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        Debug.Log($"{name} spawned. OwnerClientId={OwnerClientId}, IsOwner={IsOwner}, IsClient={IsClient}");
     }
 }

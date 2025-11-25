@@ -23,6 +23,8 @@ public class MouseLook : NetworkBehaviour
     {
         if (!IsOwner) return;
 
+        if (PauseMenu.GameIsPaused) return;
+
         if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
             return;
 
