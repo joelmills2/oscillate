@@ -44,6 +44,8 @@ public class PlayerMovement : NetworkBehaviour
         if (!IsOwner) return;
         if (health != null && health.IsDead) return;
 
+        if (PauseMenu.GameIsPaused) return;
+
         if (jumpAction.action.WasPressedThisFrame())
             jumpPressed = true;
     }
@@ -52,6 +54,9 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (health != null && health.IsDead) return;
+
+        if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
+            return;
 
         bool grounded = Physics.CheckSphere(
             groundCheck.position,
