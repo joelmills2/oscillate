@@ -1,9 +1,18 @@
 using UnityEngine;
 
+public enum HitboxTeam
+{
+    Player,
+    Enemy
+}
+
 public class Hitbox : MonoBehaviour
 {
     [SerializeField] Health health;
     [SerializeField] float damageMultiplier = 1f;
+    [SerializeField] HitboxTeam team;
+
+    public HitboxTeam Team => team;
 
     void Awake()
     {

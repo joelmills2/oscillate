@@ -1,3 +1,7 @@
+/*
+ *  Script adapted from ariel oliveira [o.arielg@gmail.com], found in the Unity Asset Store.
+ */
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;

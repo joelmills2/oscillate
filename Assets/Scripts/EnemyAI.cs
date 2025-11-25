@@ -65,6 +65,10 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] Material chaseMat;
     [SerializeField] Material attackMat;
 
+    [Header("Game State")]
+    [SerializeField] Health health;
+
+
     State currentState = State.Patrol;
     float nextFireTime;
     float sqrAttackRange;
@@ -86,6 +90,7 @@ public class EnemyAI : NetworkBehaviour
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
+        if (!health) health = GetComponent<Health>();
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = attackHoldDistance;
         agent.autoRepath = true;
@@ -98,6 +103,16 @@ public class EnemyAI : NetworkBehaviour
     {
 
         if (!IsServer) return;
+
+        if (health != null && health.IsDead)
+        {
+            if (agent != null)
+            {
+                agent.isStopped = true;
+                agent.ResetPath();
+            }
+            return;
+        }
 
         currentTarget = SelectBestTarget();
 
@@ -301,32 +316,33 @@ public class EnemyAI : NetworkBehaviour
         return target;
     }
 
-    void Fire()
+void Fire()
+{
+    if (!IsServer) return;
+    if (health != null && health.IsDead) return;
+    if (!projectilePrefab || !firePoint || !currentTarget) return;
+
+    Vector3 dir = (currentTarget.position - firePoint.position).normalized;
+    Vector3 spawnPos = firePoint.position + dir * spawnOffset;
+
+    GameObject proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
+
+    NetworkObject netObj = proj.GetComponent<NetworkObject>();
+    if (netObj != null)
+        netObj.Spawn();
+
+    Projectile p = proj.GetComponent<Projectile>();
+    if (p != null)
     {
-        if (!IsServer) return;
-        if (!projectilePrefab || !firePoint || !currentTarget) return;
-
-        Vector3 dir = (currentTarget.position - firePoint.position).normalized;
-        Vector3 spawnPos = firePoint.position + dir * spawnOffset;
-
-        var proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
-
-        var netObj = proj.GetComponent<NetworkObject>();
-        if (netObj != null)
-        {
-            netObj.Spawn();
-        }
-
-        var rb = proj.GetComponent<Rigidbody>();
-        var p = proj.GetComponent<Projectile>();
-        if (p != null)
-        {
-            var myCols = GetComponentsInChildren<Collider>();
-            p.Init(myCols);
-        }
-        if (rb != null) rb.linearVelocity = dir * projectileSpeed;
-        nextFireTime = Time.time + fireCooldown;
+        Collider[] myCols = GetComponentsInChildren<Collider>();
+        p.SetTargetTeam(HitboxTeam.Player);
+        p.SetDamage(1);
+        p.Init(myCols, ulong.MaxValue, dir, WeaponType.None);
     }
+
+    nextFireTime = Time.time + fireCooldown;
+}
+
 
     bool CanSeeTarget(Transform targetTransform)
     {
@@ -417,6 +433,19 @@ public class EnemyAI : NetworkBehaviour
 
         return best;
     }
+
+    public float ChaseSpeed
+    {
+        get => chaseSpeed;
+        set => chaseSpeed = value;
+    }
+
+    public float FireCooldown
+    {
+        get => fireCooldown;
+        set => fireCooldown = Mathf.Max(0.1f, value);
+    }
+
 
 
     [ClientRpc]

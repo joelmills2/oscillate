@@ -3,7 +3,7 @@ using Unity.Netcode;
 
 public class Health : NetworkBehaviour
 {
-    [SerializeField] int maxHealth = 10;
+    [SerializeField] int maxHealth = 50;
 
     public NetworkVariable<int> CurrentHealth = new NetworkVariable<int>();
 
@@ -39,6 +39,14 @@ public class Health : NetworkBehaviour
     {
         if (!IsServer) return;
         invincible = value;
+    }
+
+    public void SetMaxHealth(int value)
+    {
+        if (!IsServer) return;
+        maxHealth = Mathf.Max(1, value);
+        if (CurrentHealth.Value > maxHealth)
+            CurrentHealth.Value = maxHealth;
     }
 
     public int MaxHealth => maxHealth;
