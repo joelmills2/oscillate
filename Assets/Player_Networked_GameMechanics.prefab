@@ -862,7 +862,7 @@ GameObject:
   - component: {fileID: 8161471640089388726}
   - component: {fileID: 8159607626515216738}
   m_Layer: 0
-  m_Name: Player_Networked
+  m_Name: Player_Networked_GameMechanics
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
