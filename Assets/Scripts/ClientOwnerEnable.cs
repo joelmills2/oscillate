@@ -14,11 +14,10 @@ public class ClientOwnerEnable : NetworkBehaviour
 
     void Awake()
     {
-        // Auto-wire on this prefab instance if left empty
         if (!playerCamera) playerCamera = GetComponentInChildren<Camera>(true);
         if (!audioListener) audioListener = GetComponentInChildren<AudioListener>(true);
         if (!cameraController && playerCamera)
-            cameraController = playerCamera.GetComponent<Behaviour>(); // or your specific script
+            cameraController = playerCamera.GetComponent<Behaviour>();
 
         SetLocalControlsEnabled(false);
     }

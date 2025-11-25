@@ -6,7 +6,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
 using TMPro;
-// using Unity.Netcode.Transports.UTP; // uncomment later if you want custom IP/port
 
 public class MainMenu : MonoBehaviour
 {
@@ -14,8 +13,6 @@ public class MainMenu : MonoBehaviour
     [SerializeField] private string gameScene = "PathfindingScene";
 
     [SerializeField] private TMP_InputField playerNameInput;
-
-    // [SerializeField] private TMP_InputField ipInputField;
 
     private NetworkManager Net => NetworkManager.Singleton;
 
@@ -35,14 +32,11 @@ public class MainMenu : MonoBehaviour
         if (!started)
         {
             Debug.LogError("Failed to start host.");
-            // UpdateStatus("Failed to start host.");
             return;
         }
 
-        // Host controls scene changes. This will move everyone into PathfindingScene.
         Net.SceneManager.LoadScene(gameScene, LoadSceneMode.Single);
         Debug.Log("Host started, loading scene: " + gameScene);
-        // UpdateStatus("Hosting game...");
     }
 
     public void StartClient()
@@ -54,9 +48,6 @@ public class MainMenu : MonoBehaviour
         }
 
         CachePlayerName();
-
-        // var utp = (UnityTransport)Net.NetworkConfig.NetworkTransport;
-        // utp.ConnectionData.Address = ipInputField.text;
 
         bool started = Net.StartClient();
         if (!started)

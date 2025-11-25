@@ -1,3 +1,7 @@
+/*
+Chat system sourced from: https://youtu.be/ATiBSj_KHv8
+*/
+
 using UnityEngine;
 using Unity.Netcode;
 using TMPro;
