@@ -13,6 +13,7 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] float jumpHeight = 1.5f;
     [SerializeField] float groundRadius = 0.3f;
     [SerializeField] float fallMultiplier = 2.5f;
+    [SerializeField] Transform viewTransform;
 
     Rigidbody rb;
     Health health;
@@ -71,7 +72,16 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         Vector2 input = moveAction.action.ReadValue<Vector2>();
-        Vector3 dir = (transform.right * input.x + transform.forward * input.y).normalized;
+
+        Vector3 forward = viewTransform.forward;
+        forward.y = 0f;
+        forward.Normalize();
+
+        Vector3 right = viewTransform.right;
+        right.y = 0f;
+        right.Normalize();
+
+        Vector3 dir = (right * input.x + forward * input.y).normalized;
 
         Vector3 v = rb.linearVelocity;
         v.x = dir.x * speed;

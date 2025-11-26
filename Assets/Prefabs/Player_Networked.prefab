@@ -1067,6 +1067,7 @@ MonoBehaviour:
   jumpHeight: 6
   groundRadius: 0.3
   fallMultiplier: 2.5
+  viewTransform: {fileID: 5906646698505667635}
 --- !u!136 &616171380626209275
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -1130,15 +1131,15 @@ MonoBehaviour:
   RotationMaxInterpolationTime: 0.1
   ScaleLerpSmoothing: 1
   ScaleMaxInterpolationTime: 0.1
-  AuthorityMode: 0
+  AuthorityMode: 1
   TickSyncChildren: 0
   UseUnreliableDeltas: 0
   SyncPositionX: 1
   SyncPositionY: 1
   SyncPositionZ: 1
-  SyncRotAngleX: 1
-  SyncRotAngleY: 1
-  SyncRotAngleZ: 1
+  SyncRotAngleX: 0
+  SyncRotAngleY: 0
+  SyncRotAngleZ: 0
   SyncScaleX: 1
   SyncScaleY: 1
   SyncScaleZ: 1
@@ -1753,8 +1754,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
-  playerBody: {fileID: 3780644482787533085}
-  sensitivity: 100
+  sensitivity: 1
   lookAction: {fileID: -5630151704836100654, guid: 289c1b55c9541489481df5cc06664110, type: 3}
 --- !u!1 &6962896793205247144
 GameObject:
