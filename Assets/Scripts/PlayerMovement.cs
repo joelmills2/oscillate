@@ -5,22 +5,24 @@ using Unity.Netcode;
 [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
 public class PlayerMovement : NetworkBehaviour
 {
-    [SerializeField] private InputActionReference moveAction;
-    [SerializeField] private InputActionReference jumpAction;
-    [SerializeField] private Transform groundCheck;
-    [SerializeField] private LayerMask groundMask;
-    [SerializeField] private float speed = 12f;
-    [SerializeField] private float jumpHeight = 1.5f;
-    [SerializeField] private float groundRadius = 0.3f;
+    [SerializeField] InputActionReference moveAction;
+    [SerializeField] InputActionReference jumpAction;
+    [SerializeField] Transform groundCheck;
+    [SerializeField] LayerMask groundMask;
+    [SerializeField] float speed = 12f;
+    [SerializeField] float jumpHeight = 1.5f;
+    [SerializeField] float groundRadius = 0.3f;
+    [SerializeField] float fallMultiplier = 2.5f;
+    [SerializeField] Transform viewTransform;
 
-    [SerializeField] private float fallMultiplier = 2.5f;
-
-    private Rigidbody rb;
-    private bool jumpPressed;
+    Rigidbody rb;
+    Health health;
+    bool jumpPressed;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        health = GetComponent<Health>();
         rb.freezeRotation = true;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -40,8 +42,10 @@ public class PlayerMovement : NetworkBehaviour
 
     void Update()
     {
-        // Only the local owner should read input
         if (!IsOwner) return;
+        if (health != null && health.IsDead) return;
+
+        if (PauseMenu.GameIsPaused) return;
 
         if (jumpAction.action.WasPressedThisFrame())
             jumpPressed = true;
@@ -49,8 +53,11 @@ public class PlayerMovement : NetworkBehaviour
 
     void FixedUpdate()
     {
-        // Only the local owner should control velocity
         if (!IsOwner) return;
+        if (health != null && health.IsDead) return;
+
+        if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
+            return;
 
         bool grounded = Physics.CheckSphere(
             groundCheck.position,
@@ -65,7 +72,16 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         Vector2 input = moveAction.action.ReadValue<Vector2>();
-        Vector3 dir = (transform.right * input.x + transform.forward * input.y).normalized;
+
+        Vector3 forward = viewTransform.forward;
+        forward.y = 0f;
+        forward.Normalize();
+
+        Vector3 right = viewTransform.right;
+        right.y = 0f;
+        right.Normalize();
+
+        Vector3 dir = (right * input.x + forward * input.y).normalized;
 
         Vector3 v = rb.linearVelocity;
         v.x = dir.x * speed;
@@ -83,6 +99,5 @@ public class PlayerMovement : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        Debug.Log($"{name} spawned. OwnerClientId={OwnerClientId}, IsOwner={IsOwner}, IsClient={IsClient}");
     }
 }

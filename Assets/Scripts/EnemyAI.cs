@@ -45,8 +45,8 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] LayerMask obstacleMask;
 
     [Header("Look Behaviour")]
-    [SerializeField] float lookYawAmplitude = 45f;
-    [SerializeField] float lookYawSpeed = 0.6f;
+    [SerializeField] float lookYawAmplitude = 85f;
+    [SerializeField] float lookYawSpeed = 0.75f;
     [SerializeField] float rotateSpeedDeg = 360f;
 
     [Header("Attack Settings")]
@@ -56,14 +56,18 @@ public class EnemyAI : NetworkBehaviour
     [SerializeField] float spawnOffset = 0.4f;
 
     [Header("Pathfinding")]
-    [SerializeField] float sampleMaxDistance = 3f;
-    [SerializeField] float repathInterval = 0.25f;
+    [SerializeField] float sampleMaxDistance = 5f;
+    [SerializeField] float repathInterval = 0.1f;
     [SerializeField] float repathMoveThreshold = 0.75f;
 
     [Header("Visuals")]
     [SerializeField] Material idlePatrolMat;
     [SerializeField] Material chaseMat;
     [SerializeField] Material attackMat;
+
+    [Header("Game State")]
+    [SerializeField] Health health;
+
 
     State currentState = State.Patrol;
     float nextFireTime;
@@ -86,6 +90,7 @@ public class EnemyAI : NetworkBehaviour
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
+        if (!health) health = GetComponent<Health>();
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = attackHoldDistance;
         agent.autoRepath = true;
@@ -98,6 +103,16 @@ public class EnemyAI : NetworkBehaviour
     {
 
         if (!IsServer) return;
+
+        if (health != null && health.IsDead)
+        {
+            if (agent != null)
+            {
+                agent.isStopped = true;
+                agent.ResetPath();
+            }
+            return;
+        }
 
         currentTarget = SelectBestTarget();
 
@@ -301,32 +316,33 @@ public class EnemyAI : NetworkBehaviour
         return target;
     }
 
-    void Fire()
+void Fire()
+{
+    if (!IsServer) return;
+    if (health != null && health.IsDead) return;
+    if (!projectilePrefab || !firePoint || !currentTarget) return;
+
+    Vector3 dir = (currentTarget.position - firePoint.position).normalized;
+    Vector3 spawnPos = firePoint.position + dir * spawnOffset;
+
+    GameObject proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
+
+    NetworkObject netObj = proj.GetComponent<NetworkObject>();
+    if (netObj != null)
+        netObj.Spawn();
+
+    Projectile p = proj.GetComponent<Projectile>();
+    if (p != null)
     {
-        if (!IsServer) return;
-        if (!projectilePrefab || !firePoint || !currentTarget) return;
-
-        Vector3 dir = (currentTarget.position - firePoint.position).normalized;
-        Vector3 spawnPos = firePoint.position + dir * spawnOffset;
-
-        var proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
-
-        var netObj = proj.GetComponent<NetworkObject>();
-        if (netObj != null)
-        {
-            netObj.Spawn();
-        }
-
-        var rb = proj.GetComponent<Rigidbody>();
-        var p = proj.GetComponent<Projectile>();
-        if (p != null)
-        {
-            var myCols = GetComponentsInChildren<Collider>();
-            p.Init(myCols);
-        }
-        if (rb != null) rb.linearVelocity = dir * projectileSpeed;
-        nextFireTime = Time.time + fireCooldown;
+        Collider[] myCols = GetComponentsInChildren<Collider>();
+        p.SetTargetTeam(HitboxTeam.Player);
+        p.SetDamage(1);
+        p.Init(myCols, ulong.MaxValue, dir, WeaponType.None);
     }
+
+    nextFireTime = Time.time + fireCooldown;
+}
+
 
     bool CanSeeTarget(Transform targetTransform)
     {
@@ -381,6 +397,10 @@ public class EnemyAI : NetworkBehaviour
             if (np == null || !np.IsSpawned)
                 continue;
 
+            Health h = np.GetComponent<Health>();
+            if (h != null && h.IsDead)
+                continue;
+
             Transform t = np.transform;
             float sqrDist = (t.position - transform.position).sqrMagnitude;
 
@@ -398,6 +418,10 @@ public class EnemyAI : NetworkBehaviour
                 Transform t = playerCandidates[i];
                 if (!t) continue;
 
+                Health h = t.GetComponent<Health>();
+                if (h != null && h.IsDead)
+                    continue;
+
                 float sqrDist = (t.position - transform.position).sqrMagnitude;
                 if (sqrDist < bestSqrDist)
                 {
@@ -406,8 +430,23 @@ public class EnemyAI : NetworkBehaviour
                 }
             }
         }
+
         return best;
     }
+
+    public float ChaseSpeed
+    {
+        get => chaseSpeed;
+        set => chaseSpeed = value;
+    }
+
+    public float FireCooldown
+    {
+        get => fireCooldown;
+        set => fireCooldown = Mathf.Max(0.1f, value);
+    }
+
+
 
     [ClientRpc]
     void ApplyMaterialsClientRpc(State s)

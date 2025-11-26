@@ -1,31 +1,54 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
-public class MouseLook : MonoBehaviour
+public class MouseLook : NetworkBehaviour
 {
-    [SerializeField] private Transform playerBody;
-    [SerializeField] private float sensitivity = 100f;
-    [SerializeField] private InputActionReference lookAction;
+    [SerializeField] float sensitivity = 1.5f;
+    [SerializeField] InputActionReference lookAction;
 
-    private float xRot;
+    float yaw;
+    float pitch;
 
-    void Start()
+    public override void OnNetworkSpawn()
     {
+        if (!IsOwner)
+        {
+            enabled = false;
+            return;
+        }
+
+        lookAction.action.Enable();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
-    void OnEnable()  => lookAction.action.Enable();
-    void OnDisable() => lookAction.action.Disable();
+    void OnDisable()
+    {
+        if (IsOwner)
+        {
+            lookAction.action.Disable();
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+    }
 
     void Update()
     {
-        Vector2 look = lookAction.action.ReadValue<Vector2>();
-        float yaw = look.x * sensitivity * Time.deltaTime;
-        float pitch = look.y * sensitivity * Time.deltaTime;
+        if (!IsOwner) return;
+        if (PauseMenu.GameIsPaused) return;
 
-        xRot = Mathf.Clamp(xRot - pitch, -90f, 90f);
-        transform.localRotation = Quaternion.Euler(xRot, 0f, 0f);
-        if (playerBody) playerBody.Rotate(Vector3.up * yaw, Space.World);
+        if (ChatManager.Singleton != null && ChatManager.Singleton.IsTyping)
+            return;
+
+        Vector2 look = lookAction.action.ReadValue<Vector2>();
+
+        float deltaYaw = look.x * sensitivity;
+        float deltaPitch = look.y * sensitivity;
+
+        yaw += deltaYaw;
+        pitch = Mathf.Clamp(pitch - deltaPitch, -90f, 90f);
+
+        transform.localRotation = Quaternion.Euler(pitch, yaw, 0f);
     }
 }
