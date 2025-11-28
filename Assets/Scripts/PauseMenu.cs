@@ -59,19 +59,18 @@ public class PauseMenu : NetworkBehaviour
 
     public void LoadMenu()
     {
-        Resume();
-
         if (IsHost)
         {
             SendClientsToMenuClientRpc();
-            ReturnToMenuLocal();
+            NetworkManager.Singleton.Shutdown();
+            SceneManager.LoadScene(menuSceneName);
         }
         else
         {
-            ReturnToMenuLocal();
+            NetworkManager.Singleton.Shutdown();
+            SceneManager.LoadScene(menuSceneName);
         }
     }
-
 
     public void QuitGame()
     {
@@ -98,12 +97,4 @@ public class PauseMenu : NetworkBehaviour
         NetworkManager.Singleton.Shutdown();
         SceneManager.LoadScene(menuSceneName);
     }
-
-    void ReturnToMenuLocal()
-    {
-        GameIsPaused = false;
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-    }
-
 }
