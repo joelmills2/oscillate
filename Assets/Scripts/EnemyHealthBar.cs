@@ -19,10 +19,7 @@ public class EnemyHealthBar : MonoBehaviour
     {
         if (health == null || fillImage == null) return;
 
-        float t = 0f;
-        if (health.MaxHealth > 0)
-            t = Mathf.Clamp01(health.CurrentHealth.Value / (float)health.MaxHealth);
-        fillImage.fillAmount = t;
+        fillImage.fillAmount = health.Normalized;
 
         if (!faceCamera) return;
 

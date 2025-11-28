@@ -98,6 +98,9 @@ public class EnemyRespawn : NetworkBehaviour
     {
         levelIndex++;
 
+        if (IsServer && MatchStatsManager.Instance != null)
+            MatchStatsManager.Instance.EnemyDeathCount.Value = levelIndex;
+
         int newMaxHealth = baseMaxHealth + healthIncreasePerLevel * levelIndex;
         if (health != null)
         {

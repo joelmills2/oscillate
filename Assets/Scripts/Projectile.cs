@@ -95,12 +95,26 @@ public class Projectile : NetworkBehaviour
 
             if (WeaponLevelManager.Instance != null && weaponType == WeaponType.Bow)
                 WeaponLevelManager.Instance.AddDamage(WeaponType.Bow, damage);
+
+            if (weaponType == WeaponType.Bow)
+                RegisterPlayerDamage(shooterClientId, damage);
         }
 
         if (didDamage)
             HitConfirmClientRpc(shooterClientId);
 
         DespawnProjectile();
+    }
+
+    void RegisterPlayerDamage(ulong shooterId, int amount)
+    {
+        if (NetworkManager.Singleton == null) return;
+        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(shooterId, out var client)) return;
+        if (client.PlayerObject == null) return;
+
+        PlayerCombat pc = client.PlayerObject.GetComponent<PlayerCombat>();
+        if (pc != null)
+            pc.RegisterDamageDealt(amount);
     }
 
     [ClientRpc]

@@ -51,4 +51,6 @@ public class Health : NetworkBehaviour
 
     public int MaxHealth => maxHealth;
     public bool IsDead => CurrentHealth.Value <= 0;
+
+    public float Normalized => maxHealth > 0 ? CurrentHealth.Value / (float)maxHealth : 0f;
 }

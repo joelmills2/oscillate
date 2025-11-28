@@ -51,6 +51,8 @@ public class PlayerCombat : NetworkBehaviour
     public WeaponType CurrentWeaponType => equippedWeaponType;
     public WeaponRarity CurrentWeaponRarity => equippedRarity;
 
+    public NetworkVariable<int> TotalDamageDealt = new NetworkVariable<int>();
+
     void Awake()
     {
         if (!health) health = GetComponent<Health>();
@@ -224,8 +226,12 @@ public class PlayerCombat : NetworkBehaviour
             }
         }
 
-        if (totalDamage > 0 && WeaponLevelManager.Instance != null)
-            WeaponLevelManager.Instance.AddDamage(WeaponType.Sword, totalDamage);
+        if (totalDamage > 0)
+        {
+            if (WeaponLevelManager.Instance != null)
+                WeaponLevelManager.Instance.AddDamage(WeaponType.Sword, totalDamage);
+            RegisterDamageDealt(totalDamage);
+        }
     }
 
 
@@ -298,5 +304,12 @@ public class PlayerCombat : NetworkBehaviour
 
         NetworkObject spawned = Instantiate(prefab, position, Quaternion.identity);
         spawned.Spawn();
+    }
+
+    public void RegisterDamageDealt(int amount)
+    {
+        if (!IsServer) return;
+        if (amount <= 0) return;
+        TotalDamageDealt.Value += amount;
     }
 }
