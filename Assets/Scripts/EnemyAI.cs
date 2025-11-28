@@ -12,23 +12,24 @@
 
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.Netcode;
 
-public class EnemyAI : MonoBehaviour
+public class EnemyAI : NetworkBehaviour
 {
     public enum State { Idle, Patrol, Chase, Attack }
 
     [Header("References")]
-    [SerializeField] Transform player;
+    [SerializeField] Transform[] playerCandidates;
     [SerializeField] NavMeshAgent agent;
 
     [Header("Ranges")]
-    [SerializeField] float detectRange = 30f;
+    [SerializeField] float detectRange = 40f;
     [SerializeField] float attackRange = 12f;
     [SerializeField] float attackHoldDistance = 8f;
 
     [Header("Speeds")]
-    [SerializeField] float patrolSpeed = 4.5f;
-    [SerializeField] float chaseSpeed = 10f;
+    [SerializeField] float patrolSpeed = 10f;
+    [SerializeField] float chaseSpeed = 8.5f;
 
     [Header("Timers")]
     [SerializeField] float fireCooldown = 0.75f;
@@ -39,13 +40,13 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] Transform[] patrolPoints;
 
     [Header("Line of Sight")]
-    [SerializeField] float viewAngle = 60f;
+    [SerializeField] float viewAngle = 120f;
     [SerializeField] float eyeHeight = 1.6f;
     [SerializeField] LayerMask obstacleMask;
 
     [Header("Look Behaviour")]
-    [SerializeField] float lookYawAmplitude = 45f;
-    [SerializeField] float lookYawSpeed = 0.6f;
+    [SerializeField] float lookYawAmplitude = 85f;
+    [SerializeField] float lookYawSpeed = 0.75f;
     [SerializeField] float rotateSpeedDeg = 360f;
 
     [Header("Attack Settings")]
@@ -55,14 +56,18 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] float spawnOffset = 0.4f;
 
     [Header("Pathfinding")]
-    [SerializeField] float sampleMaxDistance = 3f;
-    [SerializeField] float repathInterval = 0.25f;
+    [SerializeField] float sampleMaxDistance = 5f;
+    [SerializeField] float repathInterval = 0.1f;
     [SerializeField] float repathMoveThreshold = 0.75f;
 
     [Header("Visuals")]
     [SerializeField] Material idlePatrolMat;
     [SerializeField] Material chaseMat;
     [SerializeField] Material attackMat;
+
+    [Header("Game State")]
+    [SerializeField] Health health;
+
 
     State currentState = State.Patrol;
     float nextFireTime;
@@ -80,9 +85,12 @@ public class EnemyAI : MonoBehaviour
 
     SkinnedMeshRenderer[] ghostMeshes;
 
+    Transform currentTarget;
+
     void Awake()
     {
         if (!agent) agent = GetComponent<NavMeshAgent>();
+        if (!health) health = GetComponent<Health>();
         sqrAttackRange = attackRange * attackRange;
         agent.stoppingDistance = attackHoldDistance;
         agent.autoRepath = true;
@@ -93,12 +101,45 @@ public class EnemyAI : MonoBehaviour
 
     void Update()
     {
-        if (!player) return;
 
-        bool visible = CanSeePlayer();
-        if (visible) timeSinceLastSeen = 0f; else timeSinceLastSeen += Time.deltaTime;
+        if (!IsServer) return;
 
-        float sqrDist = (player.position - transform.position).sqrMagnitude;
+        if (health != null && health.IsDead)
+        {
+            if (agent != null)
+            {
+                agent.isStopped = true;
+                agent.ResetPath();
+            }
+            return;
+        }
+
+        currentTarget = SelectBestTarget();
+
+        if (!currentTarget)
+        {
+            if (currentState != State.Patrol && currentState != State.Idle)
+                SetState(State.Patrol);
+
+            agent.isStopped = false;
+            agent.speed = patrolSpeed;
+            if (!agent.hasPath)
+            {
+                currentGoal = GetNextPatrolDestination();
+                SmartPathToNextPatrolPoint(currentGoal);
+            }
+            UpdateLook(true);
+
+            Vector3 pvel = agent.desiredVelocity; pvel.y = 0f;
+            if (pvel.sqrMagnitude > 0.01f) lastMoveDir = pvel.normalized;
+            return;
+        }
+
+        bool visible = CanSeeTarget(currentTarget);
+        if (visible) timeSinceLastSeen = 0f;
+        else timeSinceLastSeen += Time.deltaTime;
+
+        float sqrDist = (currentTarget.position - transform.position).sqrMagnitude;
         bool inAttack = sqrDist <= sqrAttackRange;
 
         switch (currentState)
@@ -135,22 +176,47 @@ public class EnemyAI : MonoBehaviour
             case State.Chase:
                 agent.isStopped = false;
                 agent.speed = chaseSpeed;
-                Vector3 tgt = player.position;
+                Vector3 tgt = currentTarget.position;
                 if (RequireNewPath(tgt)) SmartPathToNextPatrolPoint(tgt);
                 if (!visible && timeSinceLastSeen >= stayInChaseTime) SetState(State.Patrol);
                 if (inAttack) SetState(State.Attack);
                 break;
-
             case State.Attack:
-                agent.isStopped = false;
-                agent.speed = 0f;
-                SmartPathToNextPatrolPoint(player.position);
-                Vector3 look = player.position; look.y = transform.position.y;
+            {
+                float dist = Mathf.Sqrt(sqrDist);
+
+                if (dist < attackHoldDistance)
+                {
+                    agent.isStopped = false;
+                    agent.speed = chaseSpeed;
+
+                    Vector3 toTarget = currentTarget.position - transform.position;
+                    toTarget.y = 0f;
+                    if (toTarget.sqrMagnitude < 0.001f)
+                        toTarget = transform.forward;
+
+                    Vector3 awayDir = -toTarget.normalized;
+                    agent.Move(awayDir * chaseSpeed * Time.deltaTime);
+                }
+                else
+                {
+                    agent.isStopped = true;
+                    agent.speed = 0f;
+                    agent.ResetPath();
+                }
+
+                Vector3 look = currentTarget.position;
+                look.y = transform.position.y;
                 transform.LookAt(look);
-                if (Time.time >= nextFireTime) Fire();
-                if (!visible) SetState(State.Patrol);
-                else if (!inAttack) SetState(State.Chase);
+
+                if (Time.time >= nextFireTime)
+                    Fire();
+
+                if (!inAttack)
+                    SetState(State.Chase);
+
                 break;
+            }
         }
 
         Vector3 vel = agent.desiredVelocity; vel.y = 0f;
@@ -184,6 +250,11 @@ public class EnemyAI : MonoBehaviour
         }
 
         ApplyMaterials(next);
+
+        if (IsServer && IsSpawned)
+        {
+            ApplyMaterialsClientRpc(next);
+        }
     }
 
     void ApplyMaterials(State s)
@@ -245,33 +316,47 @@ public class EnemyAI : MonoBehaviour
         return target;
     }
 
-    void Fire()
+void Fire()
+{
+    if (!IsServer) return;
+    if (health != null && health.IsDead) return;
+    if (!projectilePrefab || !firePoint || !currentTarget) return;
+
+    Vector3 dir = (currentTarget.position - firePoint.position).normalized;
+    Vector3 spawnPos = firePoint.position + dir * spawnOffset;
+
+    GameObject proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
+
+    NetworkObject netObj = proj.GetComponent<NetworkObject>();
+    if (netObj != null)
+        netObj.Spawn();
+
+    Projectile p = proj.GetComponent<Projectile>();
+    if (p != null)
     {
-        if (!projectilePrefab || !firePoint || !player) return;
-        Vector3 dir = (player.position - firePoint.position).normalized;
-        Vector3 spawnPos = firePoint.position + dir * spawnOffset;
-        var proj = Instantiate(projectilePrefab, spawnPos, Quaternion.LookRotation(dir));
-        var rb = proj.GetComponent<Rigidbody>();
-        var p = proj.GetComponent<Projectile>();
-        if (p != null)
-        {
-            var myCols = GetComponentsInChildren<Collider>();
-            p.Init(myCols);
-        }
-        if (rb != null) rb.linearVelocity = dir * projectileSpeed;
-        nextFireTime = Time.time + fireCooldown;
+        Collider[] myCols = GetComponentsInChildren<Collider>();
+        p.SetTargetTeam(HitboxTeam.Player);
+        p.SetDamage(1);
+        p.Init(myCols, ulong.MaxValue, dir, WeaponType.None);
     }
 
-    bool CanSeePlayer()
+    nextFireTime = Time.time + fireCooldown;
+}
+
+
+    bool CanSeeTarget(Transform targetTransform)
     {
-        if (!player) return false;
+        if (!targetTransform) return false;
+
         Vector3 origin = transform.position + Vector3.up * eyeHeight;
-        Vector3 target = player.position;
+        Vector3 target = targetTransform.position;
         Vector3 dir = (target - origin).normalized;
         float dist = Vector3.Distance(origin, target);
+
         if (dist > detectRange) return false;
         if (Vector3.Angle(transform.forward, dir) > viewAngle * 0.5f) return false;
         if (Physics.Raycast(origin, dir, dist, obstacleMask)) return false;
+
         return true;
     }
 
@@ -300,5 +385,73 @@ public class EnemyAI : MonoBehaviour
         Gizmos.DrawSphere(agent.destination, 0.25f);
         Gizmos.color = Color.white;
         Gizmos.DrawLine(transform.position, agent.destination);
+    }
+
+    Transform SelectBestTarget()
+    {
+        Transform best = null;
+        float bestSqrDist = float.PositiveInfinity;
+
+        foreach (var np in NetworkPlayer.ServerPlayers)
+        {
+            if (np == null || !np.IsSpawned)
+                continue;
+
+            Health h = np.GetComponent<Health>();
+            if (h != null && h.IsDead)
+                continue;
+
+            Transform t = np.transform;
+            float sqrDist = (t.position - transform.position).sqrMagnitude;
+
+            if (sqrDist < bestSqrDist)
+            {
+                bestSqrDist = sqrDist;
+                best = t;
+            }
+        }
+
+        if (best == null && playerCandidates != null && playerCandidates.Length > 0)
+        {
+            for (int i = 0; i < playerCandidates.Length; i++)
+            {
+                Transform t = playerCandidates[i];
+                if (!t) continue;
+
+                Health h = t.GetComponent<Health>();
+                if (h != null && h.IsDead)
+                    continue;
+
+                float sqrDist = (t.position - transform.position).sqrMagnitude;
+                if (sqrDist < bestSqrDist)
+                {
+                    bestSqrDist = sqrDist;
+                    best = t;
+                }
+            }
+        }
+
+        return best;
+    }
+
+    public float ChaseSpeed
+    {
+        get => chaseSpeed;
+        set => chaseSpeed = value;
+    }
+
+    public float FireCooldown
+    {
+        get => fireCooldown;
+        set => fireCooldown = Mathf.Max(0.1f, value);
+    }
+
+
+
+    [ClientRpc]
+    void ApplyMaterialsClientRpc(State s)
+    {
+        if (IsServer) return;
+        ApplyMaterials(s);
     }
 }
