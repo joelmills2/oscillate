@@ -15,6 +15,7 @@ public class Health : NetworkBehaviour
         {
             CurrentHealth.Value = maxHealth;
             invincible = false;
+            SyncHealthClientRpc(CurrentHealth.Value, maxHealth);
         }
     }
 
@@ -27,12 +28,14 @@ public class Health : NetworkBehaviour
 
         int next = Mathf.Max(CurrentHealth.Value - amount, 0);
         CurrentHealth.Value = next;
+        SyncHealthClientRpc(CurrentHealth.Value, maxHealth);
     }
 
     public void ResetHealth()
     {
         if (!IsServer) return;
         CurrentHealth.Value = maxHealth;
+        SyncHealthClientRpc(CurrentHealth.Value, maxHealth);
     }
 
     public void SetInvincible(bool value)
@@ -47,10 +50,19 @@ public class Health : NetworkBehaviour
         maxHealth = Mathf.Max(1, value);
         if (CurrentHealth.Value > maxHealth)
             CurrentHealth.Value = maxHealth;
+        SyncHealthClientRpc(CurrentHealth.Value, maxHealth);
     }
 
     public int MaxHealth => maxHealth;
     public bool IsDead => CurrentHealth.Value <= 0;
 
     public float Normalized => maxHealth > 0 ? CurrentHealth.Value / (float)maxHealth : 0f;
+
+    [ClientRpc]
+    void SyncHealthClientRpc(int current, int max)
+    {
+        var bars = GetComponentsInChildren<EnemyHealthBar>(true);
+        for (int i = 0; i < bars.Length; i++)
+            bars[i].SetFromValues(current, max);
+    }
 }

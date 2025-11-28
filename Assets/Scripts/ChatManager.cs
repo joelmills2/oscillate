@@ -19,9 +19,18 @@ public class ChatManager : NetworkBehaviour
 
     public string playerName;
 
+    bool isTyping;
+
     void Awake()
     {
         Singleton = this;
+    }
+
+    void OnDisable()
+    {
+        if (chatInput != null)
+            chatInput.DeactivateInputField();
+        isTyping = false;
     }
 
     void Update()
@@ -32,7 +41,10 @@ public class ChatManager : NetworkBehaviour
         if (kb == null) return;
 
         if (kb.tKey.wasPressedThisFrame)
+        {
+            isTyping = true;
             chatInput.ActivateInputField();
+        }
 
         bool pressedEnter =
             (kb.enterKey != null && kb.enterKey.wasPressedThisFrame) ||
@@ -47,6 +59,7 @@ public class ChatManager : NetworkBehaviour
         }
 
         chatInput.DeactivateInputField();
+        isTyping = false;
     }
 
     public void SendChatMessage(string message, string fromWho = null)
@@ -97,6 +110,6 @@ public class ChatManager : NetworkBehaviour
 
     public bool IsTyping
     {
-        get { return chatInput != null && chatInput.isFocused; }
+        get { return isTyping; }
     }
 }

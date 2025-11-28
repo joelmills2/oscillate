@@ -11,16 +11,20 @@ public class EnemyHealthBar : MonoBehaviour
 
     void Awake()
     {
-        if (!health) health = GetComponentInParent<Health>();
         cam = Camera.main;
+    }
+
+    public void SetFromValues(int current, int max)
+    {
+        if (!fillImage) return;
+        float t = 0f;
+        if (max > 0)
+            t = Mathf.Clamp01(current / (float)max);
+        fillImage.fillAmount = t;
     }
 
     void LateUpdate()
     {
-        if (health == null || fillImage == null) return;
-
-        fillImage.fillAmount = health.Normalized;
-
         if (!faceCamera) return;
 
         if (cam == null) cam = Camera.main;
